@@ -87,5 +87,9 @@ On the real 2 October series (read from the public API into a scratch
 folder), the afternoon session gets one note, "52 min (0:45–52:59)", and the
 morning session at Palmer none.
 
-**Still to do:** deploy, then a decision and `COMPLETED`, and the plan
-deleted.
+**Deployed, 2026-10-07**, as revision `00040` (`4ee30cc`), with a live stream
+open across it (a throwaway `smoke-gps` car; `1012`, reconnected at once,
+"courses: unchanged"). Both messages are in the deployed bundle. The car and
+its session were removed after.
+
+**Still to do:** a decision and `COMPLETED`, and the plan deleted.

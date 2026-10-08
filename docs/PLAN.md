@@ -38,7 +38,7 @@ Where this plan and the contract disagree, the contract wins. Fix the plan.
 | **M21** | One site: the landing page shows every page in short; sign in and out on every page turns on each page's edits; the admin page goes | **deployed** (00035); waiting on Sam's sign-in: [`plans/M21-ONE-SITE.md`](plans/M21-ONE-SITE.md) |
 | **M22** | Timing lines in one click: square across the path at the click, ends draggable, stopping short of other paths | **deployed** (00036); waiting on Sam's Palmer lines: [`plans/M22-ONE-CLICK-LINES.md`](plans/M22-ONE-CLICK-LINES.md) |
 | **M23** | Users: invited by the master admin; each car, event, course and driver edited by its creator and whoever they add, deleted only by its creator or the master | **planned**: [`plans/M23-USERS.md`](plans/M23-USERS.md) |
-| **M24** | "GPS lost": a banner on the car's live page when it's moving with no position for 30 s, and each gap noted on a session's page | **built**: [`plans/M24-GPS-LOST.md`](plans/M24-GPS-LOST.md) |
+| **M24** | "GPS lost": a banner on the car's live page when it's moving with no position for 30 s, and each gap noted on a session's page | **deployed** (00040): [`plans/M24-GPS-LOST.md`](plans/M24-GPS-LOST.md) |
 
 **How a milestone runs**, as in the app:
 - A plan in `docs/plans/` sketches every step.
