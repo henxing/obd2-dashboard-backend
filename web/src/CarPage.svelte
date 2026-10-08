@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { gpsLostLive, lengthText } from './lib/gps'
   import { onMount, untrack } from 'svelte'
   import SessionMap from './SessionMap.svelte'
   import Faults from './widgets/Faults.svelte'
@@ -44,6 +45,8 @@
   let reconnect: () => void = () => {}
 
   const fresh = $derived(freshness(live, now))
+  // GPS lost (M24): moving by the car's own speed, but no position from the tablet for 30 s; only while live.
+  const gpsLost = $derived(fresh.state === 'live' ? gpsLostLive(live.history, now - live.offsetMs) : null)
   const bannerText = $derived(
     fresh.state === 'stale'
       ? fresh.seconds === null ? 'Waiting for data' : `Last data ${fresh.seconds} s ago`
@@ -204,6 +207,12 @@
       <span class="banner-text">{bannerText}</span>
       {#if !connected}<span class="muted small">reconnecting…</span>{/if}
     </section>
+    {#if gpsLost}
+      <section class="banner gps-lost" role="alert">
+        <strong>GPS lost:</strong> no position for {gpsLost.atLeast ? 'over ' : ''}{lengthText(gpsLost.seconds * 1000)} while moving.
+        Laps can't be timed until it's back. Check the tablet's location setting and its view of the sky.
+      </section>
+    {/if}
 
     <h1>{slug}</h1>
     <div class="sessionline">
@@ -295,6 +304,7 @@
   }
   .banner.live { border-color: var(--in-range); }
   .banner.stale { border-color: var(--caution); color: var(--caution); }
+  .banner.gps-lost { border-color: var(--caution); color: var(--caution); display: block; margin-top: 8px; font-size: 1.1rem; font-weight: 600; }
   .banner.no_session { border-color: var(--accent); }
   .banner.offline { color: var(--muted); }
   .small { font-size: 0.85rem; font-weight: 400; }

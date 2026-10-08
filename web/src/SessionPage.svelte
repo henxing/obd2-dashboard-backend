@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { clockText, gpsGaps, lengthText } from './lib/gps'
   import { onDestroy, onMount } from 'svelte'
   import Chart from './Chart.svelte'
   import SessionMap from './SessionMap.svelte'
@@ -71,6 +72,8 @@
     }
   }
   let series = $state.raw<Series | null>(null)
+  // Stretches with no GPS while the car moved (M24): the tablet's GPS, so no route or laps then.
+  const gaps = $derived(series ? gpsGaps(series) : [])
   let missing = $state(false)
   let error = $state<string | null>(null)
 
@@ -295,6 +298,11 @@
       {#if s.state === 'live'}<a href={`/cars/${slug}`}>Watch live →</a>{/if}
       <span class="spacer"></span><UnitsSwitch />
     </p>
+    {#each gaps as g (g.from)}
+      <p class="gps-lost">
+        GPS lost for {lengthText(g.to - g.from)} ({clockText(g.from)}–{clockText(g.to)}) while the car was moving: no route or laps then.
+      </p>
+    {/each}
     {#if setter && drivers.length > 0}
       <p class="driver">
         <label>Driver
@@ -418,6 +426,7 @@
   .laps .note.flag { color: var(--caution); }
   .events { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 0.95rem; }
   .events li.fault { color: var(--critical); }
+  .gps-lost { color: var(--caution); border: 1px solid var(--caution); border-radius: 8px; padding: 8px 10px; margin: 8px 0; }
   .events li.gap { color: var(--caution); }
   .badge { display: inline-flex; align-items: center; font-size: 0.85rem; font-weight: 600; }
   .badge.live { color: var(--in-range); }
