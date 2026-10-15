@@ -39,7 +39,7 @@ describe('a timing line in one click (M22)', () => {
   })
 
   it('works at an open path’s end, and round a closed one’s first point', () => {
-    close(made(across(straight, at(-3, 2), PIT_HALF_METRES)).a, 0, 8)
+    close(made(across(straight, at(-3, 2), PIT_HALF_METRES)).a, 1, 8) // a metre in from its end point, not on it
     const square = line([0, 0], [200, 0], [200, 200], [0, 200], [0, 0])
     const r = made(across(square, at(1, -1), TRACK_HALF_METRES)) // at the corner where it closes
     expect(r.length).toBeCloseTo(24, 0)
@@ -84,5 +84,17 @@ describe('a timing line in one click (M22)', () => {
     const r = made(across(hairpin, at(100, 0), TRACK_HALF_METRES, [self]))
     close(r.a, 100, 9)
     expect(r.shortened).toEqual(['another stretch of this layout'])
+  })
+
+  it('never goes through one of the path’s points: the tablet counts that as crossing twice', () => {
+    // A right-angle bend at (200, 0); a click just outside it lands on the corner's point.
+    const bend = line([0, 0], [200, 0], [200, 200])
+    const r = made(across(bend, at(203, -3), TRACK_HALF_METRES))
+    const mid: [number, number] = [(r.a[0] + r.b[0]) / 2, (r.a[1] + r.b[1]) / 2]
+    expect(Math.hypot(mid[0] - 200, mid[1])).toBeGreaterThan(0.5)
+    // Off the line by more than the server's 0.1 m: the corner isn't on it.
+    const [dx, dy] = [r.b[0] - r.a[0], r.b[1] - r.a[1]]
+    const off = Math.abs(dx * (0 - r.a[1]) - dy * (200 - r.a[0])) / Math.hypot(dx, dy)
+    expect(off).toBeGreaterThan(0.1)
   })
 })

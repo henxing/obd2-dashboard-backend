@@ -111,6 +111,8 @@ public object CourseRules {
         startFinish.mapNotNull { it.first }.filter { it !in ids }.forEach { problems += "a start/finish names the layout \"$it\", which isn't drawn" }
         sectors.map { it.first }.filter { it !in ids }.toSet().forEach { problems += "sectors name the layout \"$it\", which isn't drawn" }
 
+        // The tablet's frame (its `Track.frame`): metres from the default layout's first point.
+        val origin = (layouts.firstOrNull { it.third.first } ?: layouts.firstOrNull())?.third?.second?.firstOrNull()
         val built = layouts.mapNotNull { (id, name, rest) ->
             val own = startFinish.filter { it.first == id }
             val shared = startFinish.filter { it.first == null }
@@ -122,6 +124,10 @@ public object CourseRules {
             val mine = sectors.filter { it.first == id }.sortedBy { it.second }
             if (mine.map { it.second } != (1..mine.size).toList()) {
                 problems += "the layout \"$id\" numbers its sectors ${mine.map { it.second }}; they go 1, 2, 3… without gaps"
+            }
+            if (origin != null && rest.second.size >= 2) {
+                line?.let { crossProblem(rest.second, it, origin) }?.let { problems += "the layout \"$id\"'s start/finish $it" }
+                mine.forEach { s -> crossProblem(rest.second, s.third, origin)?.let { problems += "sector ${s.second} of the layout \"$id\" $it" } }
             }
             line?.let { Layout(id, name, rest.first || layouts.size == 1, rest.second, it, mine.map { s -> s.third }) }
         }
@@ -143,6 +149,50 @@ public object CourseRules {
             val lat = (pair.getOrNull(1) as? JsonPrimitive)?.doubleOrNull ?: return null
             if (lon !in -180.0..180.0 || lat !in -90.0..90.0) return null
             LonLat(lon, lat)
+        }
+    }
+
+    /** Closer than this to one of a layout's points, a line counts as through it. */
+    private const val CORNER_METRES = 0.1
+    private const val METRES_PER_DEGREE = 111_195.0
+
+    /**
+     * Why [line] doesn't cross [path] exactly once, as the tablet counts it (its `Polyline.crossings`, in a frame
+     * on [origin]). Touching counts, so a line through one of the path's points crosses both stretches that
+     * meet there, and the tablet then times the layout without sectors (a one-click sector line on a test
+     * course, 2026-10-14). Near a point counts as through it, so rounding can't decide it.
+     */
+    internal fun crossProblem(path: List<LonLat>, line: Line, origin: LonLat): String? {
+        val perLon = METRES_PER_DEGREE * cos(Math.toRadians(origin.lat))
+        fun xy(p: LonLat) = Pair((p.lon - origin.lon) * perLon, (p.lat - origin.lat) * METRES_PER_DEGREE)
+        val (ax, ay) = xy(line.a)
+        val (bx, by) = xy(line.b)
+        val points = path.map(::xy)
+        val sx = bx - ax
+        val sy = by - ay
+        val length2 = sx * sx + sy * sy
+        val nearAPoint = points.any { (px, py) ->
+            val t = (((px - ax) * sx + (py - ay) * sy) / length2).coerceIn(0.0, 1.0)
+            val dx = px - (ax + t * sx)
+            val dy = py - (ay + t * sy)
+            dx * dx + dy * dy < CORNER_METRES * CORNER_METRES
+        }
+        if (nearAPoint) return "goes through one of its points, which a tablet counts as crossing it twice: move it a metre or two along"
+        val crossings = points.zipWithNext().count { (p1, p2) ->
+            val rx = p2.first - p1.first
+            val ry = p2.second - p1.second
+            val denominator = rx * sy - ry * sx
+            if (denominator == 0.0) return@count false
+            val qx = ax - p1.first
+            val qy = ay - p1.second
+            val t = (qx * sy - qy * sx) / denominator
+            val u = (qx * ry - qy * rx) / denominator
+            t in 0.0..1.0 && u in 0.0..1.0
+        }
+        return when (crossings) {
+            1 -> null
+            0 -> "doesn't cross it"
+            else -> "crosses it $crossings times; it must cross once"
         }
     }
 

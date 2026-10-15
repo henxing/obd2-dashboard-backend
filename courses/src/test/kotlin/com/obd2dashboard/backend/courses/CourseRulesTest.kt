@@ -150,6 +150,20 @@ class CourseRulesTest {
     }
 
     @Test
+    fun `a timing line crosses its layout exactly once, never through one of its points (as the tablet counts)`() {
+        val corner = LAT + 0.002 // the loop's north-west point
+        val diagonal = listOf(LON - 0.0001 to corner + 0.0001, LON + 0.0001 to corner - 0.0001) // through it, as a one-click line was
+        refused(layout("east"), feature("start_finish", across(0.0005)), feature("sector", diagonal, mapOf("layout" to "east", "index" to 1))).single() shouldBe
+            "sector 1 of the layout \"east\" goes through one of its points, which a tablet counts as crossing it twice: move it a metre or two along"
+        val slid = listOf(LON - 0.0001 to corner - 0.0001, LON + 0.0001 to corner - 0.0003) // the same, two metres along
+        CourseRules.check(course(layout("east"), feature("start_finish", across(0.0005)), feature("sector", slid, mapOf("layout" to "east", "index" to 1))))
+            .shouldBeInstanceOf<CourseCheck.Ok>()
+        val beside = listOf(LON + 0.0003 to LAT + 0.0005, LON + 0.0006 to LAT + 0.0005) // inside the loop, crossing nothing
+        refused(layout("east"), feature("start_finish", beside)).single() shouldBe
+            "the layout \"east\"'s start/finish doesn't cross it"
+    }
+
+    @Test
     fun `a course is at most 256 KB`() {
         val huge = feature("layout", List(12_000) { LON + it * 1e-7 to LAT }, mapOf("id" to "east", "name" to "East"))
         refused(huge, feature("start_finish", across(0.0005))) shouldContain "a course is at most 256 KB"

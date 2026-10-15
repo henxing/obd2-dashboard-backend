@@ -331,6 +331,8 @@ export const CLICK_REACH_METRES = 30
 const CLEARANCE_METRES = 1
 /** The path's direction at a click, from this far along it each way: one kinked segment doesn't skew it. */
 const DIRECTION_METRES = 10
+/** A made line's centre this close to one of the path's points is slid along the path, off it. */
+const CORNER_METRES = 0.5
 
 /** Another path a made line must stop short of: crossings within [sameWithin] metres of the click are the same track. */
 export interface Obstacle {
@@ -406,6 +408,21 @@ function firstCrossing(path: readonly Xy[], o: Xy, u: Xy, from: number): number 
 }
 
 /**
+ * [near] on [path], or a metre or two along it when that's one of the path's points: a line through a point
+ * crosses both stretches that meet there, and the tablet then drops the layout's sectors (a test course,
+ * 2026-10-14). A click just outside a bend lands on the corner's point.
+ */
+function offCorner(path: readonly Xy[], near: { at: Xy; along: number }, total: number, loop: boolean): Xy {
+  const onAPoint = (p: Xy) => path.some((v) => Math.hypot(v[0] - p[0], v[1] - p[1]) < CORNER_METRES)
+  if (!onAPoint(near.at)) return near.at
+  for (const d of [1, -1, 2, -2]) {
+    const p = pointAlong(path, near.along + d, total, loop)
+    if (!onAPoint(p)) return p
+  }
+  return near.at
+}
+
+/**
  * A timing line made from one click (M22): square across [path] at its
  * nearest point to [click], [half] metres each side, each half cut
  * [CLEARANCE_METRES] short of the first of [others] it would cross. A click
@@ -428,7 +445,7 @@ export function across(path: readonly Pt[], click: Pt, half: number, others: rea
   if (dLen === 0) return { tooFar: near.distance }
   const dir: Xy = [(ahead[0] - behind[0]) / dLen, (ahead[1] - behind[1]) / dLen]
   const sides: Xy[] = [[-dir[1], dir[0]], [dir[1], -dir[0]]] // left of the way cars go, then right
-  const c = near.at
+  const c = offCorner(xy, near, total, loop)
   const shortened = new Set<string>()
   const ends = sides.map((u) => {
     let reach = half

@@ -454,3 +454,21 @@ whole drive, the admin page's Download.
 - **1 GiB deployed** (`00033`, 2026-09-30) with a stream across it: a clean
   `1012` and at once reconnected. Memory with the stream running: 27–29% of
   1 GiB (~290 MB), against 98–99% of 512 MiB after the long sessions.
+
+## 2026-10-14 — a sector line through a corner
+
+- **A test course's sectors never showed on the tablet**, though its laps
+  were timed. One sector line went **exactly through one of the layout's
+  points** (0.00 m from it), so it touched the two stretches meeting there.
+  The tablet counts touching as crossing (its `crossing`, ends inclusive),
+  saw 2, and times a layout without sectors when any sector line doesn't
+  cross exactly once. It was a one-click line (M22): its centre is the
+  path's nearest point to the click, and a click just outside a bend lands
+  on the corner's point.
+- **Fixed on this side:** a one-click line's centre slides a metre or two
+  along the path off any point (`offCorner`); and the server's course check
+  refuses a start/finish or sector line that doesn't cross its layout
+  exactly once, as the tablet counts, or passes within 0.1 m of one of its
+  points. The editor shows the server's check live, so it blocks the save.
+  Every course on the site passed it; the two versions the tablet had choked
+  on were refused.
