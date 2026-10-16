@@ -6,6 +6,7 @@
  * without a browser.
  */
 import type { Point, Rec } from './live'
+import { fromShown, type System } from './units'
 import { lapRows, type LapRecord, type LapRow, type Series } from './sessionPage'
 
 /** What the dashboard shows (M18.5): every signal the car sends, each in the widget its kind and unit call for. */
@@ -136,6 +137,41 @@ export const SWEEP = 240
 
 export function needleAngle(value: number, p: Profile): number {
   return -SWEEP / 2 + fraction(value, p) * SWEEP
+}
+
+/**
+ * A dial's own scale, in the units shown, for a unit whose quarters read
+ * badly once converted (0–250 km/h was 39, 78, 117 mph): its range, a mark
+ * every [step], a number every [label]. Sam, 2026-10-16: "0-120 with 10mph
+ * intervals"; a number every 20, so they fit the dial.
+ */
+export interface DialScale {
+  min: number
+  max: number
+  step: number
+  label: number
+}
+
+const DIALS: Record<string, Record<System, DialScale>> = {
+  'km/h': { us: { min: 0, max: 120, step: 10, label: 20 }, metric: { min: 0, max: 200, step: 20, label: 40 } },
+}
+
+export function dialScale(unit: string, system: System): DialScale | null {
+  return DIALS[unit]?.[system] ?? null
+}
+
+/** [p] with its range as [scale] says, in the signal's own unit. */
+export function scaled(p: Profile, scale: DialScale | null, unit: string, system: System): Profile {
+  return scale ? { ...p, min: fromShown(scale.min, unit, system), max: fromShown(scale.max, unit, system) } : p
+}
+
+/** A dial's marks: where each falls (0 to 1) and its number, if it has one. */
+export function dialMarks(scale: DialScale): { f: number; text: string | null }[] {
+  const marks: { f: number; text: string | null }[] = []
+  for (let v = scale.min; v <= scale.max + 1e-9; v += scale.step) {
+    marks.push({ f: (v - scale.min) / (scale.max - scale.min), text: Math.round(v - scale.min) % scale.label === 0 ? String(Math.round(v)) : null })
+  }
+  return marks
 }
 
 /** The stretches of a range that are caution or critical, as fractions, for drawing on a dial or bar. */

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { level, needleAngle, profile, zoneBands, SWEEP, type Freshness } from '../lib/dashboard'
+  import { dialMarks, dialScale, level, needleAngle, profile, scaled, zoneBands, SWEEP, type Freshness } from '../lib/dashboard'
   import { label } from '../lib/live'
   import { readout } from '../lib/readout'
   import { toShown } from '../lib/units'
@@ -7,12 +7,14 @@
 
   let { signal, unit, value, freshness }: { signal: string; unit: string; value: number | null; freshness: Freshness } = $props()
 
-  const p = $derived(profile(signal, unit))
+  // A speed's dial in the units shown (0–120 mph); any other, its range in quarters.
+  const scale = $derived(dialScale(unit, units.system))
+  const p = $derived(scaled(profile(signal, unit), scale, unit, units.system))
   const lv = $derived(level(value, p))
   const shown = $derived(readout(value, unit, units.system))
   const angle = $derived(value === null ? -SWEEP / 2 : needleAngle(value, p))
   const bands = $derived(zoneBands(p))
-  const ticks = $derived([0, 0.25, 0.5, 0.75, 1].map((f) => ({ f, text: Math.round(toShown(p.min + f * (p.max - p.min), unit, units.system)).toString() })))
+  const ticks = $derived(scale ? dialMarks(scale) : [0, 0.25, 0.5, 0.75, 1].map((f) => ({ f, text: Math.round(toShown(p.min + f * (p.max - p.min), unit, units.system)).toString() as string | null })))
 
   // A dial of radius 80 around (100, 100); 0° straight up, clockwise.
   const R = 80
@@ -34,8 +36,15 @@
     <path class="track" d={arc(0, 1)} />
     {#each bands as b (b.level + b.from)}<path class={`band ${b.level}`} d={arc(b.from, b.to)} />{/each}
     {#each ticks as t (t.f)}
-      {@const [x, y] = point(-SWEEP / 2 + t.f * SWEEP, R - 20)}
-      <text class="tick" {x} {y} text-anchor="middle" dominant-baseline="middle">{t.text}</text>
+      {#if scale}
+        {@const [x0, y0] = point(-SWEEP / 2 + t.f * SWEEP, R - 6)}
+        {@const [x1, y1] = point(-SWEEP / 2 + t.f * SWEEP, R - (t.text === null ? 11 : 14))}
+        <line class="mark" x1={x0} y1={y0} x2={x1} y2={y1} />
+      {/if}
+      {#if t.text !== null}
+        {@const [x, y] = point(-SWEEP / 2 + t.f * SWEEP, R - (scale ? 26 : 20))}
+        <text class="tick" {x} {y} text-anchor="middle" dominant-baseline="middle">{t.text}</text>
+      {/if}
     {/each}
     {#if value !== null}
       <g transform={`rotate(${angle} 100 100)`}><line class="needle" x1="100" y1="108" x2="100" y2={100 - R + 6} /></g>
@@ -55,6 +64,7 @@
   .band.caution { stroke: var(--caution); }
   .band.critical { stroke: var(--critical); }
   .tick { fill: var(--muted); font-size: 11px; }
+  .mark { stroke: var(--muted); stroke-width: 1.5; }
   .needle { stroke: var(--text); stroke-width: 3; stroke-linecap: round; }
   .hub { fill: var(--text); }
   .value { fill: var(--text); font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
