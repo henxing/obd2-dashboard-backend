@@ -59,18 +59,25 @@ object Standings {
         race: RaceNowInput? = null,
         /** Every driver by id: edited stints can name one who drove no session. */
         roster: Map<String, Driver> = drivers.values.filterNotNull().associateBy { it.id },
+        /** Driver changes within sessions (M27), by session, on `wall`: who drove from then. */
+        changes: Map<String, List<StintMark>> = emptyMap(),
     ): Standing {
         val onLayout = runs.filter { course == null || it.layout == course.layout }
         // Until the session the car is in has a lap, nothing of the race, as at its very start (M26: Sunday's, before
         // its first crossing, isn't Saturday's stint going on).
         val carRace = race?.let { r ->
-            Race.sessions(car, onLayout, r.sessions.map { it.copy(edited = it.edited?.takeIf { e -> e.isNotEmpty() }) }, drivers.mapValues { it.value?.id })
+            Race.sessions(car, onLayout, r.sessions.map { it.copy(edited = it.edited?.takeIf { e -> e.isNotEmpty() }) }, drivers.mapValues { it.value?.id }, changes)
         }?.takeIf { it.sessions.lastOrNull()?.firstLap != null }
         val byId = roster
-        // In the race, a lap's driver is its stint's; elsewhere its session's.
+        // Who drove [session] at [at] on `wall` (M27): its last change before then, else its driver.
+        fun driverAt(session: String, at: Long?): Driver? {
+            val change = at?.let { t -> changes[session]?.lastOrNull { it.start < t } } ?: return drivers[session]
+            return change.driver?.let(byId::get)
+        }
+        // In the race, a lap's driver is its stint's; elsewhere its session's, or the change's before it ended.
         fun driverOf(run: RunTiming, lap: RunLap): Driver? {
             val raceLap = carRace?.laps?.firstOrNull { it.session == lap.session && it.start == wall(run, lap.session, lap.startAt) }
-            return raceLap?.let { l -> carRace.stints.getOrNull(l.stint - 1)?.driver?.let(byId::get) } ?: drivers[lap.session]
+            return raceLap?.let { l -> carRace.stints.getOrNull(l.stint - 1)?.driver?.let(byId::get) } ?: driverAt(lap.session, wall(run, lap.session, lap.endAt))
         }
         val counting = onLayout.flatMap { run -> run.laps.filter { it.session in counted }.map { run to it } }
         val best = counting.filter { (_, l) -> !l.pitIn && !l.pitOut }.minByOrNull { (_, l) -> l.time }?.let { (run, l) ->
@@ -81,7 +88,9 @@ object Standings {
         }
         return Standing(
             session, course, best, sectors,
-            driver = driverNow(carRace, race?.sessions?.lastOrNull()?.edited?.isNotEmpty() == true, onLayout, session, drivers, byId),
+            // Who's driving now: the session's last change, if it has any (M27), else its driver.
+            driver = driverNow(carRace, race?.sessions?.lastOrNull()?.edited?.isNotEmpty() == true, onLayout, session,
+                drivers + (session to driverAt(session, Long.MAX_VALUE)), byId, changes[session]?.lastOrNull()?.start),
             race = carRace?.let { RaceNow(it.laps.size, leftPits(it)) },
         )
     }
@@ -89,7 +98,7 @@ object Standings {
     /** §22.6: an in-lap's last sector and an out-lap's first never count. */
     private fun countsForBest(lap: RunLap, i: Int) = !(lap.pitIn && i == lap.sectors.size - 1) && !(lap.pitOut && i == 0)
 
-    private fun driverNow(race: CarRace?, edited: Boolean, runs: List<RunTiming>, session: String, drivers: Map<String, Driver?>, byId: Map<String, Driver>): DriverNow? {
+    private fun driverNow(race: CarRace?, edited: Boolean, runs: List<RunTiming>, session: String, drivers: Map<String, Driver?>, byId: Map<String, Driver>, changedAt: Long? = null): DriverNow? {
         if (race != null) {
             // Stints the crew edited say who; else the session's driver as set (from the car page, say), else the stint's.
             val stint = race.stints.lastOrNull()
@@ -104,7 +113,8 @@ object Standings {
         val exit = runs.flatMap { r -> r.pitCrossings.filter { it.kind == "out" }.mapNotNull { c -> wall(r, c.session, c.at) } }.maxOrNull()
         val first = run?.laps?.firstOrNull()?.let { wall(run, it.session, it.startAt) }
         if (driver == null && run == null) return null
-        return DriverNow(driver?.name, driver?.code, exit ?: first)
+        // A driver change (M27) begins a stint too, if it's the latest.
+        return DriverNow(driver?.name, driver?.code, listOfNotNull(exit ?: first, changedAt).maxOrNull())
     }
 
     /**

@@ -8,7 +8,8 @@
   let { rows, bestSectors }: { rows: LapRow[]; bestSectors?: (number | null)[] } = $props()
 
   const s = $derived(lapSummary(rows))
-  const recent = $derived([...rows].sort((a, b) => b.lap - a.lap).slice(0, 8))
+  // The newest by when they ended, and keyed so: lap numbers repeat within a session (app 1.0.1, STREAM off and on).
+  const recent = $derived([...rows].sort((a, b) => b.end - a.end).slice(0, 8))
   const bests = $derived(sectorBests(rows, bestSectors))
 </script>
 
@@ -23,7 +24,7 @@
   </div>
   <table>
     <tbody>
-      {#each recent as lap (lap.lap)}
+      {#each recent as lap (lap.end)}
         <tr class:best={lap.best}><td>{lap.lap}</td><td class="t">{lapTime(lap.time)}</td>
           {#each bests as b, i (i)}<td class="s" class:sbest={b !== null && lap.sectors?.[i] === b}>{lap.sectors?.[i]?.toFixed(3) ?? ''}</td>{/each}
           <td class="muted">{lap.best ? 'Best' : lap.pitIn ? 'Into the pits' : lap.pitOut ? 'Out of the pits' : ''}</td></tr>

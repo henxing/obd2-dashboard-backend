@@ -1,6 +1,7 @@
 package com.obd2dashboard.backend
 
 import com.obd2dashboard.backend.archive.ArchiveService
+import com.obd2dashboard.backend.archive.SessionRecord
 import com.obd2dashboard.backend.courses.CourseCheck
 import com.obd2dashboard.backend.courses.CourseRules
 import com.obd2dashboard.backend.courses.CourseStore
@@ -70,6 +71,11 @@ data class SessionResult(
     val live: Boolean = false,
     /** What the admin or the crew called it (M18.3). */
     val name: String? = null,
+    /**
+     * Which of its drivers' stretches this row is (M27): 0 for the first;
+     * a session whose driver changed is a row per stretch, each with its laps.
+     */
+    val stretch: Int = 0,
 )
 
 /** A driver's best lap in a part, or over all practice; a null driver is "not set". */
@@ -150,6 +156,22 @@ object Results {
     fun onTrack(lap: StandingLap): Boolean = !lap.pitIn && !lap.pitOut
 
     fun best(laps: List<StandingLap>): StandingLap? = laps.filter(::onTrack).minByOrNull { it.time }
+
+    /**
+     * [record]'s laps in runs of one driver (M27): each lap is the driver's whose change came before it ended.
+     * One stretch, the session's driver, when it has no changes, or no laps.
+     */
+    fun stretches(record: SessionRecord, laps: List<StandingLap>): List<Pair<String?, List<StandingLap>>> {
+        if (record.driverChanges.isEmpty() || laps.isEmpty()) return listOf(record.driver to laps)
+        val runs = mutableListOf<Pair<String?, MutableList<StandingLap>>>()
+        for (lap in laps) {
+            val driver = record.driverAt(lap.end)
+            val last = runs.lastOrNull()
+            // Not `runs.lastOrNull()?.first == driver`: with no runs yet that's null == null for a lap nobody's driving.
+            if (last != null && last.first == driver) last.second += lap else runs += driver to mutableListOf(lap)
+        }
+        return runs
+    }
 
     /** One per driver (a session with none counts as "not set"), fastest first. */
     fun driverBests(sessions: List<SessionResult>): List<DriverBest> =
@@ -274,11 +296,14 @@ fun Route.publicEventRoutes(
                     standingLaps(run, r.id)?.let { SessionLaps(run.course, course?.name ?: run.course, run.courseVersion, run.layout, it) }
                 }
                 val other = laps?.layout?.takeIf { it != event.layout }
-                SessionResult(
-                    r.id, r.car, r.driver?.let { drivers[it] }?.view(), r.created.toEpochMilli(),
-                    laps?.laps.orEmpty(), other, if (other == null) Results.best(laps?.laps.orEmpty()) else null, live = r.id in liveIds, name = r.name,
-                )
-            }
+                // A row per driver's stretch (M27): each lap is its driver's.
+                Results.stretches(r, laps?.laps.orEmpty()).mapIndexed { i, (driver, stretch) ->
+                    SessionResult(
+                        r.id, r.car, driver?.let { drivers[it] }?.view(), r.created.toEpochMilli(),
+                        stretch, other, if (other == null) Results.best(stretch) else null, live = r.id in liveIds, name = r.name, stretch = i,
+                    )
+                }
+            }.flatten()
             val sectors = Results.bestSectors(results)
             PartResults(
                 publicPart, results, Results.driverBests(results), sectors,
@@ -313,6 +338,7 @@ fun Route.publicEventRoutes(
                         )
                     },
                     drivers = sessions.associate { it.id to it.driver },
+                    changes = sessions.associate { r -> r.id to r.driverChanges.map { StintMark(it.from, it.driver) } },
                 )?.let { c -> c.copy(laps = c.laps.map { l -> if (l.session in liveIds) l.copy(live = true) else l }) }?.let { it to offset }
             }
             RaceResults(

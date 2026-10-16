@@ -193,5 +193,44 @@ class DriverRoutesTest {
         name("/api/cars/outback/sessions/$s/name", c, "two\nlines").status shouldBe HttpStatusCode.BadRequest
         nameOf(s) shouldBe "x".repeat(60)
     }
-}
 
+    private suspend fun ApplicationTestBuilder.changes(path: String, cookie: String?, body: String, origin: String? = "http://localhost"): HttpResponse =
+        client.put(path) {
+            header(HttpHeaders.Host, "localhost")
+            origin?.let { header(HttpHeaders.Origin, it) }
+            cookie?.let { header(HttpHeaders.Cookie, it) }
+            contentType(ContentType.Application.Json)
+            setBody(body)
+        }
+
+    @Test
+    fun `driver changes within a session (M27) - the crew and the admin set the whole list, nobody else, checked`() = testApplication {
+        app()
+        val c = crew("outback", "outback-crew")
+        set("/api/cars/outback/sessions/$s/driver", c, "d-sam").status shouldBe HttpStatusCode.OK
+        changes("/api/cars/outback/sessions/$s/driver-changes", c, """{"changes":[{"from":2000,"driver":"d-sam"},{"from":1000,"driver":"d-alex"}]}""").let {
+            it.status shouldBe HttpStatusCode.OK
+            it.bodyAsText() shouldBe """{"changes":[{"from":1000,"driver":"d-alex"},{"from":2000,"driver":"d-sam"}]}""" // in order
+        }
+        json.decodeFromString<SessionDetail>(client.get("/api/sessions/$s").bodyAsText()).let {
+            it.driver shouldBe DriverView("d-sam", "Sam Voigt", "SAM") // from the start
+            it.driverChanges shouldBe listOf(DriverChangeDetail(1000, DriverView("d-alex", "Alex Rider", "ALE")), DriverChangeDetail(2000, DriverView("d-sam", "Sam Voigt", "SAM")))
+        }
+        log.list.map { it.formattedMessage } shouldContain "driver changes: session $s of outback, d-alex from 1000, d-sam from 2000 by the crew of outback"
+        // The admin, for any car; an empty list is the session's driver throughout again.
+        val a = admin()
+        changes("/api/admin/sessions/$s/driver-changes", a, """{"changes":[]}""").status shouldBe HttpStatusCode.OK
+        sessions.get(s)!!.driverChanges shouldBe emptyList()
+        changes("/api/admin/sessions/$s/driver-changes", a, """{"changes":[]}""", origin = "https://evil.example").status shouldBe HttpStatusCode.Forbidden
+        // Nobody else; and never two at one moment, an unknown driver, a moment that isn't one, or test data.
+        val yaris = crew("yaris", "pit-lane")
+        changes("/api/cars/outback/sessions/$s/driver-changes", null, """{"changes":[]}""").status shouldBe HttpStatusCode.Unauthorized
+        changes("/api/cars/outback/sessions/$s/driver-changes", yaris, """{"changes":[]}""").status shouldBe HttpStatusCode.Unauthorized
+        changes("/api/cars/yaris/sessions/$s/driver-changes", yaris, """{"changes":[]}""").status shouldBe HttpStatusCode.NotFound
+        changes("/api/cars/outback/sessions/$s/driver-changes", c, """{"changes":[{"from":1000,"driver":"d-sam"},{"from":1000,"driver":"d-alex"}]}""").status shouldBe HttpStatusCode.BadRequest
+        changes("/api/cars/outback/sessions/$s/driver-changes", c, """{"changes":[{"from":1000,"driver":"d-nobody"}]}""").status shouldBe HttpStatusCode.BadRequest
+        changes("/api/cars/outback/sessions/$s/driver-changes", c, """{"changes":[{"from":0,"driver":"d-sam"}]}""").status shouldBe HttpStatusCode.BadRequest
+        changes("/api/cars/outback/sessions/$fake/driver-changes", c, """{"changes":[]}""").status shouldBe HttpStatusCode.Conflict
+        sessions.get(s)!!.driverChanges shouldBe emptyList()
+    }
+}

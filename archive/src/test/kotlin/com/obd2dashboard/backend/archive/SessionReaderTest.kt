@@ -197,7 +197,8 @@ class SessionReaderTest {
             // One log was cut mid-line by unplugging the adapter: its last line alone is unreadable,
             // and it is counted, not fatal. (The archive refuses such a line, so no archived session has one.)
             (s.unreadable <= 1) shouldBe true
-            (s.lines > 1000) shouldBe true
+            // Read, not empty: some are short on purpose (the tablet's own 1-second sessions of 2026-10-01).
+            (s.lines > 10) shouldBe true
         }
     }
 }

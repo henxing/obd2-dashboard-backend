@@ -183,7 +183,7 @@ class HiddenTest {
         // a path no route serves was a JSON 404 for a hidden car, and routing's empty one for a car that never existed).
         for ((method, path) in listOf(
             HttpMethod.Get to "/api/cars/secret-car", HttpMethod.Get to "/api/cars/secret-car/nope", HttpMethod.Get to "/api/cars/secret-car/login",
-            HttpMethod.Post to "/api/cars/secret-car/login", HttpMethod.Post to "/api/cars/secret-car/messages", HttpMethod.Put to "/api/cars/secret-car/events/open-day/race",
+            HttpMethod.Post to "/api/cars/secret-car/login", HttpMethod.Post to "/api/cars/secret-car/messages", HttpMethod.Put to "/api/cars/secret-car/sessions/x/driver-changes", HttpMethod.Put to "/api/cars/secret-car/events/open-day/race",
             HttpMethod.Get to "/api/courses/secret-course/nope", HttpMethod.Delete to "/api/courses/secret-course", HttpMethod.Get to "/api/events/secret-event/nope",
         )) {
             val about = never.keys.first { path.contains(it) }

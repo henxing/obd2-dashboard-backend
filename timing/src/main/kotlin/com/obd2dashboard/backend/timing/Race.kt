@@ -118,6 +118,8 @@ public object Race {
         edited: List<StintMark>? = null,
         green: Long? = null,
         flag: Long? = null,
+        /** Driver changes within sessions (M27), by session, on `wall`: each starts a default stint, and is who drove from then. */
+        changes: Map<String, List<StintMark>> = emptyMap(),
     ): CarRace? {
         val parts = runs.map { run -> lapsOf(run, raceSessions) to crossingsOf(run, raceSessions) }
         val raw = mutableListOf<RaceLap>()
@@ -134,7 +136,7 @@ public object Race {
         if (raw.isEmpty()) return null
         val numbered = raw.mapIndexed { i, lap -> lap.copy(number = i + 1) }
         val stops = stopsOf(parts.flatMap { it.second }.sortedBy { it.second }, numbered)
-        val marks = (edited?.takeIf { it.isNotEmpty() } ?: defaultStints(numbered, stops, drivers)).sortedBy { it.start }
+        val marks = (edited?.takeIf { it.isNotEmpty() } ?: defaultStints(numbered, stops, drivers, changes.filterKeys { it in raceSessions })).sortedBy { it.start }
         // A lap is the stint's that began before it ended: a stint split where lap N starts holds lap N, not N − 1.
         val laps = numbered.map { lap -> lap.copy(stint = marks.indexOfLast { it.start < lap.end }.coerceAtLeast(0) + 1) }
         val stints = marks.mapIndexed { i, m ->
@@ -168,8 +170,10 @@ public object Race {
         runs: List<RunTiming>,
         sessions: List<RaceSessionInput>,
         drivers: Map<String, String?> = emptyMap(),
+        /** Driver changes within sessions (M27), by session, on `wall`. */
+        changes: Map<String, List<StintMark>> = emptyMap(),
     ): CarRace? {
-        val each = sessions.map { s -> s to car(car, runs, s.sessions, drivers, s.edited, s.green, s.flag) }
+        val each = sessions.map { s -> s to car(car, runs, s.sessions, drivers, s.edited, s.green, s.flag, changes) }
         val raced = each.mapNotNull { it.second }
         if (raced.isEmpty()) return null
         val laps = mutableListOf<RaceLap>()
@@ -256,11 +260,20 @@ public object Race {
         return stops
     }
 
-    /** A stint from the first lap, and one from each stop's exit (its entry if none), each driven by its first lap's session's driver. */
-    private fun defaultStints(laps: List<RaceLap>, stops: List<RaceStop>, drivers: Map<String, String?>): List<StintMark> {
-        fun driverAfter(t: Long) = laps.firstOrNull { it.end > t }?.let { drivers[it.session] }
+    /**
+     * A stint from the first lap, one from each stop's exit (its entry if none), and one from each driver change within
+     * a session (M27); each driven by whoever drove its first lap: its session's driver, or the change before it.
+     */
+    private fun defaultStints(laps: List<RaceLap>, stops: List<RaceStop>, drivers: Map<String, String?>, changes: Map<String, List<StintMark>>): List<StintMark> {
+        fun driverOf(lap: RaceLap): String? {
+            val change = changes[lap.session]?.lastOrNull { it.start < lap.end } ?: return drivers[lap.session]
+            return change.driver
+        }
+        fun driverAfter(t: Long) = laps.firstOrNull { it.end > t }?.let(::driverOf)
         val first = laps.first().start
-        return listOf(StintMark(first, driverAfter(first))) + stops.map { s -> (s.exit ?: s.entry).let { StintMark(it, driverAfter(it)) } }
+        val inRace = changes.values.flatten().filter { c -> c.start > first && c.start < laps.last().end }
+        return (listOf(StintMark(first, driverAfter(first))) + stops.map { s -> (s.exit ?: s.entry).let { StintMark(it, driverAfter(it)) } } +
+            inRace.map { StintMark(it.start, driverAfter(it.start)) }).distinctBy { it.start }
     }
 
     private fun seconds(ms: Number): Double = (ms.toDouble()).roundToLong() / 1000.0

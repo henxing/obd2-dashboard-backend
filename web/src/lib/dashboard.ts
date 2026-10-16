@@ -292,12 +292,15 @@ export interface LiveLap {
  * laps without downloading the session's series.
  */
 export function lapsFromLive(held: readonly LiveLap[], history: Point[]): LapRow[] {
-  const known = new Set(held.map((l) => l.lap))
+  // Known by when each ended, never by number: one session can have two lap 1s (app 1.0.1, STREAM off and on).
+  // Within 2 s is the same lap: the server's end is the tablet's `endAt` on its clock, the record's when it was sent.
+  const known = held.map((l) => l.wall)
+  const seen = (wall: number) => known.some((w) => Math.abs(w - wall) < 2_000)
   const lap: [number, LapRecord][] = held.map((l) => [l.wall, { lap: l.lap, time: l.time, sectors: l.sectors ?? undefined, pitIn: l.pitIn, pitOut: l.pitOut }])
   for (const p of history) {
     const r = p.rec
-    if (r.type !== 'lap' || typeof r.lap !== 'number' || typeof r.time !== 'number' || typeof r.wall !== 'number' || known.has(r.lap)) continue
-    known.add(r.lap)
+    if (r.type !== 'lap' || typeof r.lap !== 'number' || typeof r.time !== 'number' || typeof r.wall !== 'number' || seen(r.wall)) continue
+    known.push(r.wall)
     lap.push([r.wall, r as unknown as LapRecord])
   }
   const events = { stopped: [], fault: [], gap: [], lap }

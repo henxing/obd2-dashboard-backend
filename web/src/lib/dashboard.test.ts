@@ -200,6 +200,22 @@ describe('laps without the series (M19.4)', () => {
     expect(lapsFromLive([], [])).toEqual([])
   })
 
+  it('lap numbers that start again in one session (app 1.0.1, STREAM off and on): every lap, in the order driven', () => {
+    // Found live on 2026-10-16: laps 1–6, STREAM off and on, laps 1–10 again; keyed by number, the page stopped updating.
+    const held = [
+      { wall: 100_000, lap: 1, time: 70 },
+      { wall: 170_000, lap: 2, time: 70 },
+      { wall: 900_000, lap: 1, time: 75 }, // counted afresh
+    ]
+    const history = [
+      { t: 900_200, rec: { type: 'lap', lap: 1, time: 75, wall: 900_150, seq: 30 } }, // the same lap, sent a moment later
+      { t: 970_100, rec: { type: 'lap', lap: 2, time: 69, wall: 970_000, seq: 31 } }, // a second lap 2, newer
+    ]
+    const rows = lapsFromLive(held, history)
+    expect(rows.map((r) => [r.lap, r.end])).toEqual([[1, 100_000], [2, 170_000], [1, 900_000], [2, 970_000]])
+    expect(new Set(rows.map((r) => r.end)).size).toBe(rows.length) // what the panels key by
+  })
+
   it('asks the live run, and says so when it doesn\u2019t hold the session', async () => {
     const ok = (async () => new Response(JSON.stringify([{ wall: 1, lap: 1, time: 70 }]), { status: 200 })) as unknown as typeof fetch
     const none = (async () => new Response(null, { status: 204 })) as unknown as typeof fetch

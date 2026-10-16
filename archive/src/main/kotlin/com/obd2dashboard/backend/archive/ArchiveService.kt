@@ -450,6 +450,8 @@ public class ArchiveService(
     /** Sets (or with null clears) who drove session [id] (M14); false if there's no such session. */
     public suspend fun setDriver(id: String, driver: String?): Boolean = index.setDriver(id, driver)
 
+    public suspend fun setDriverChanges(id: String, changes: List<DriverChange>): Boolean = index.setDriverChanges(id, changes)
+
     /** Names the session, or clears its name (M18.3). */
     public suspend fun setName(id: String, name: String?): Boolean = index.setName(id, name)
 

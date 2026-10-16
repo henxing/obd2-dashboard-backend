@@ -250,7 +250,8 @@
       <SessionMap t={positions.map((p) => p.t)} lat={positions.map((p) => p.rec.lat as number)} lon={positions.map((p) => p.rec.lon as number)} speeds={trailSpeeds} follow />
     </section>
     {#if live.standing}<StandingPanel standing={live.standing} {serverNow} />{/if}
-    {#if crew && liveId}<DriverPicker {slug} session={liveId} current={live.standing?.driver?.code} />{/if}
+    {#if crew && liveId}<DriverPicker {slug} session={liveId} current={live.standing?.driver?.code} hasLaps={laps.length > 0}
+      nowWall={() => (live.history.at(-1)?.rec.wall as number | undefined) ?? null} />{/if}
     {#if laps.length > 0}<LapsPanel rows={laps} bestSectors={live.standing?.bestSectors} />{/if}
     <section class="dash statuses">
       {#each dash.statuses as n (n)}<Status signal={n} rec={live.latest[n]} freshness={current(n)} />{/each}

@@ -55,7 +55,8 @@ class CarTimings(
         val drivers = events.drivers.list().associateBy { it.id }
         val sessionDrivers = records.associate { it.id to it.driver?.let(drivers::get) }
         if (course == null) {
-            return Standings.of(car, session, null, emptyList(), emptySet(), sessionDrivers, roster = drivers)
+            return Standings.of(car, session, null, emptyList(), emptySet(), sessionDrivers, roster = drivers,
+                changes = records.associate { r -> r.id to r.driverChanges.map { StintMark(it.from, it.driver) } })
         }
         val scope = if (event != null) eventSessions else records.map { it.id }.toSet()
         val completeRuns = completeRuns(car, course, records.sortedBy { it.created }.map { it.id }.filter { it in scope && it in complete })
@@ -72,6 +73,7 @@ class CarTimings(
         }
         return Standings.of(
             car, session, layout?.let { CourseAt(course.id, course.version, it) }, runs, counted, sessionDrivers, race, drivers,
+            changes = records.associate { r -> r.id to r.driverChanges.map { StintMark(it.from, it.driver) } },
         )
     }
 

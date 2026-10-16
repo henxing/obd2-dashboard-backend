@@ -186,7 +186,7 @@ fun Route.adminEventRoutes(
         val id = call.parameters["id"].orEmpty()
         val email = call.may(Action.DELETE, Thing(Kind.DRIVER, id))?.email ?: return@delete
         val driver = drivers.get(id) ?: return@delete call.respond(HttpStatusCode.NotFound, ApiError("not_found", "No such driver."))
-        if (archive.sessionsOfCars(registry.list().map { it.slug.value }).any { it.driver == id }) {
+        if (archive.sessionsOfCars(registry.list().map { it.slug.value }).any { s -> s.driver == id || s.driverChanges.any { it.driver == id } }) { // a change's driver drove too (M27)
             return@delete call.respond(HttpStatusCode.Conflict, ApiError("in_use", "${driver.name} drove sessions, so stays. Rename instead."))
         }
         drivers.delete(id)

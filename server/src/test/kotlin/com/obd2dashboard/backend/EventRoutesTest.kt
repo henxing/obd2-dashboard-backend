@@ -159,6 +159,12 @@ class EventRoutesTest {
             it.status shouldBe HttpStatusCode.Conflict
             it.bodyAsText() shouldContain "Sam V drove sessions, so stays"
         }
+        // One who drove only after a change within a session (M27) stays too.
+        val kim = json.decodeFromString<DriverView>(call(HttpMethod.Post, "/api/admin/drivers", cookie, """{"name":"Kim","code":"KIM"}""").bodyAsText())
+        runBlocking { sessions.setDriverChanges("s1", listOf(com.obd2dashboard.backend.archive.DriverChange(1_000, kim.id))) }
+        call(HttpMethod.Delete, "/api/admin/drivers/${kim.id}", cookie).status shouldBe HttpStatusCode.Conflict
+        runBlocking { sessions.setDriverChanges("s1", emptyList()) }
+        call(HttpMethod.Delete, "/api/admin/drivers/${kim.id}", cookie).status shouldBe HttpStatusCode.NoContent
         call(HttpMethod.Delete, "/api/admin/drivers/${alex.id}", cookie).status shouldBe HttpStatusCode.NoContent
         json.decodeFromString<List<DriverView>>(call(HttpMethod.Get, "/api/admin/drivers", cookie).bodyAsText()).map { it.name } shouldBe listOf("Sam V")
         log.list.map { it.formattedMessage } shouldContain "driver saved: Sam V (SAM) by sam@example.com"

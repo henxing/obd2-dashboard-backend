@@ -42,6 +42,22 @@ class EventResultsTest {
     private val alex = DriverView("d-alex", "Alex Rider", "ALE")
 
     @Test
+    fun `a session whose driver changed is a stretch per driver, each lap its driver's (M27)`() {
+        fun lapAt(n: Int, time: Double, end: Long) = StandingLap(n, time, emptyList(), false, false, end - 70_000, end, "tablet")
+        val laps = listOf(lapAt(1, 72.0, 70_000), lapAt(2, 71.0, 140_000), lapAt(3, 69.5, 210_000), lapAt(4, 70.0, 280_000))
+        val record = com.obd2dashboard.backend.archive.SessionRecord("a", "outback", null, null, 0, emptyList(), true, null, 0, t0, t0, driver = "d-sam")
+        Results.stretches(record, laps) shouldBe listOf("d-sam" to laps) // no change: one, as before
+        val changed = record.copy(driverChanges = listOf(com.obd2dashboard.backend.archive.DriverChange(150_000, "d-alex")))
+        Results.stretches(changed, laps) shouldBe listOf("d-sam" to laps.take(2), "d-alex" to laps.drop(2))
+        Results.stretches(changed, emptyList()) shouldBe listOf("d-sam" to emptyList<StandingLap>())
+        // Nobody set from the start, then Alex (found on the dev server: the first stretch's driver is null).
+        Results.stretches(changed.copy(driver = null), laps) shouldBe listOf(null to laps.take(2), "d-alex" to laps.drop(2))
+        // Each stretch a row: each driver's best is their own laps'.
+        val rows = Results.stretches(changed, laps).mapIndexed { i, (d, l) -> SessionResult("a", "outback", if (d == "d-sam") sam else alex, 0, l, stretch = i) }
+        Results.driverBests(rows).map { it.driver?.code to it.lap.time } shouldBe listOf("ALE" to 69.5, "SAM" to 71.0)
+    }
+
+    @Test
     fun `each driver's best on track, fastest first, and a session with no driver counted as not set`() {
         val sessions = listOf(
             SessionResult("a", "outback", sam, 0, listOf(lap(1, 72.0), lap(2, 69.0, pitIn = true), lap(3, 71.0))),

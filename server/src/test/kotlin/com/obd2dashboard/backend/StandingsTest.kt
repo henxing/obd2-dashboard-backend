@@ -122,4 +122,21 @@ class StandingsTest {
             it.driver!!.name shouldBe "Alex Rider"
         }
     }
+
+    @Test
+    fun `a driver change within the session (M27) - who's driving now, and the best lap's driver its lap's`() {
+        // Sam's session, Alex from lap 3 on: Alex is driving now; Sam's lap 2 the best, Sam's.
+        val runs = listOf(run(lap("c1", 0, n = 1), lap("c1", 70_000, 65_000, n = 2), lap("c1", 135_000, n = 3)))
+        val changes = mapOf("c1" to listOf(StintMark(W + 140_000, "d-alex")))
+        val roster = mapOf("d-sam" to sam, "d-alex" to alex)
+        Standings.of("outback", "c1", box, runs, setOf("c1"), mapOf("c1" to sam), roster = roster, changes = changes).let {
+            it.driver!!.code shouldBe "ALE"
+            it.driver.stintStart shouldBe W + 140_000
+            it.best!!.driver shouldBe "SAM"
+        }
+        // In a race: the change is a stint, Alex's.
+        val race = RaceNowInput(listOf(RaceSessionInput("p2", setOf("c1"))))
+        Standings.of("outback", "c1", box, runs, setOf("c1"), mapOf("c1" to sam), race, roster = roster, changes = changes).driver shouldBe
+            DriverNow("Alex Rider", "ALE", W + 140_000)
+    }
 }

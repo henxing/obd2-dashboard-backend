@@ -203,4 +203,22 @@ class RaceTest {
         val saturdayOnly = Race.sessions("gti", listOf(run(lap("sat", 0, time = 60_000), lap("sat", 60_000, time = 60_000), lap("sat", 120_000, time = 60_000), lap("sat", 180_000, time = 60_000))), inputs)!!
         Race.classify(listOf(saturdayOnly, both)).map { it.car } shouldBe listOf("outback", "gti")
     }
+
+    @Test
+    fun `a driver change within a session starts a default stint, its laps the new driver's, edited stints still winning (M27)`() {
+        // One session, c1: Sam, then Alex from mid-lap 3 (the lap under way is the new driver's, as a stint's is).
+        val one = run(lap("c1", 0), lap("c1", 70_000), lap("c1", 140_000), lap("c1", 210_000))
+        val changes = mapOf("c1" to listOf(StintMark(W + 160_000, "d-alex")))
+        val race = Race.car("outback", listOf(one), setOf("c1"), drivers = mapOf("c1" to "d-sam"), changes = changes)!!
+        race.stints.map { Triple(it.driver, it.firstLap, it.lastLap) } shouldBe listOf(Triple("d-sam", 1, 2), Triple("d-alex", 3, 4))
+        // A change in a session outside the race, or before its first lap, makes no stint.
+        Race.car("outback", listOf(one), setOf("c1"), drivers = mapOf("c1" to "d-sam"), changes = mapOf("p1" to listOf(StintMark(W + 160_000, "d-alex"))))!!
+            .stints.single().driver shouldBe "d-sam"
+        // Stints as edited replace the default, the change's included.
+        Race.car("outback", listOf(one), setOf("c1"), drivers = mapOf("c1" to "d-sam"), edited = listOf(StintMark(W, "d-kim")), changes = changes)!!
+            .stints.single().driver shouldBe "d-kim"
+        // Through a race in sessions too.
+        Race.sessions("outback", listOf(one), listOf(RaceSessionInput("p2", setOf("c1"))), drivers = mapOf("c1" to "d-sam"), changes = changes)!!
+            .stints.map { it.driver } shouldBe listOf("d-sam", "d-alex")
+    }
 }

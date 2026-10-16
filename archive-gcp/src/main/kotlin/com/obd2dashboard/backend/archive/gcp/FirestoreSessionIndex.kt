@@ -11,6 +11,7 @@ import com.google.cloud.firestore.FirestoreOptions
 import com.google.cloud.firestore.Transaction
 import com.google.common.util.concurrent.MoreExecutors
 import com.obd2dashboard.backend.archive.Bounds
+import com.obd2dashboard.backend.archive.DriverChange
 import com.obd2dashboard.backend.archive.LapInfo
 import com.obd2dashboard.backend.archive.Segment
 import com.obd2dashboard.backend.archive.compacted
@@ -97,6 +98,9 @@ public class FirestoreSessionIndex(private val db: Firestore) : SessionIndex {
     override suspend fun setName(id: String, name: String?): Boolean =
         conditional(id) { current -> current.copy(name = name) }
 
+    override suspend fun setDriverChanges(id: String, changes: List<DriverChange>): Boolean =
+        conditional(id) { current -> current.copy(driverChanges = changes) }
+
     override suspend fun setClockOffset(id: String, offsetMs: Long): Boolean =
         conditional(id) { current -> current.copy(clockOffsetMs = minOf(current.clockOffsetMs ?: offsetMs, offsetMs)) }
 
@@ -176,6 +180,10 @@ public class FirestoreSessionIndex(private val db: Firestore) : SessionIndex {
             clockOffsetMs?.let { put("clockOffsetMs", it) }
             name?.let { put("name", it) }
             hashState?.let { put("hashState", it) }
+            // A list of maps (M27), never a list in a list; none written when there are none.
+            if (driverChanges.isNotEmpty()) {
+                put("driverChanges", driverChanges.map { c -> buildMap { put("from", c.from); c.driver?.let { put("driver", it) } } })
+            }
         }
 
         private fun SessionSummary.toFields(): Map<String, Any> = buildMap {
@@ -292,6 +300,9 @@ public class FirestoreSessionIndex(private val db: Firestore) : SessionIndex {
                 clockOffsetMs = (data["clockOffsetMs"] as? Number)?.toLong(),
                 name = string("name"),
                 hashState = string("hashState"),
+                driverChanges = (data["driverChanges"] as? List<*>).orEmpty().mapNotNull { it as? Map<*, *> }.mapNotNull { c ->
+                    (c["from"] as? Number)?.toLong()?.let { DriverChange(it, c["driver"] as? String) }
+                },
             )
         }
 

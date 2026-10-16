@@ -64,6 +64,10 @@ class SessionMappingTest {
         val named = complete.copy(name = "Practice 2, wet")
         recordFrom(id, named.toFields()) shouldBe named
         complete.toFields().containsKey("name") shouldBe false
+        // M27: driver changes, a list of maps; none written when there are none.
+        val changed = driven.copy(driverChanges = listOf(com.obd2dashboard.backend.archive.DriverChange(1_790_000_100_000, "d-alex"), com.obd2dashboard.backend.archive.DriverChange(1_790_000_200_000, null)))
+        recordFrom(id, changed.toFields()) shouldBe changed
+        complete.toFields().containsKey("driverChanges") shouldBe false
     }
 
     @Test

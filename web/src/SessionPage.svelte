@@ -11,6 +11,7 @@
   import { fromGeoJSON } from './lib/courseEdit'
   import { badge, clockOf, dayOf, duration, lapTime, sourceLabel, trackOf, type SessionItem } from './lib/sessions'
   import { setSessionDriver, setSessionName, whoCanSet, type Driver, type DriverSetter } from './lib/events'
+  import { driverAt, driversText, idsOf, saveDriverChanges, withChange, withoutChange, type DriverChangeDetail } from './lib/driverChanges'
   import { signin } from './lib/signin'
   import { indexesIn, readWindow, withWindow } from './lib/laps'
   import type { LapPick } from './lib/comparePick'
@@ -29,8 +30,10 @@
     carName: string
     gaps: number
     missed: number
-    /** Who drove it (M14.4). */
+    /** Who drove it (M14.4); from its start, if the driver changed within it (M27). */
     driver?: Driver | null
+    /** Where the driver changed within it (M27). */
+    driverChanges?: DriverChangeDetail[]
   }
 
   let detail = $state<Detail | null>(null)
@@ -55,6 +58,35 @@
     } catch (e) {
       nameError = e instanceof Error ? e.message : String(e)
     }
+  }
+
+  // Driver changes within the session (M27): made at a lap's start, as a race's stints are split.
+  let changeLap = $state('')
+  let changeDriver = $state('')
+  const changes = $derived(detail?.driverChanges ?? [])
+  /** The lap a change falls in: the first to end after it. */
+  const lapOfChange = (from: number) => laps.find((l) => l.end > from)?.lap
+
+  async function saveChanges(next: ReturnType<typeof idsOf>) {
+    const d = detail
+    if (!d || !setter) return
+    settingDriver = true
+    driverError = null
+    try {
+      await saveDriverChanges(setter, slug, d.session.id, next)
+      detail = { ...d, driverChanges: next.map((c) => ({ from: c.from, driver: drivers.find((x) => x.id === c.driver) ?? null })) }
+      changeLap = ''
+    } catch (e) {
+      driverError = e instanceof Error ? e.message : String(e)
+    } finally {
+      settingDriver = false
+    }
+  }
+
+  function addChange() {
+    const lap = laps.find((l) => l.lap === Number(changeLap))
+    if (!lap) { driverError = `There's no lap ${changeLap}.`; return }
+    void saveChanges(withChange(idsOf(changes), lap.start, changeDriver || null))
   }
 
   async function chooseDriver(id: string | null) {
@@ -234,7 +266,7 @@
   }
 
   function showLap(lap: LapRow) {
-    chosenLap = lap.lap
+    chosenLap = lap.end // by when it ended: two laps can share a number (app 1.0.1)
     range = [lap.start / 1000, lap.end / 1000]
     showWindow([lap.start, lap.end])
   }
@@ -305,7 +337,7 @@
     {/each}
     {#if setter && drivers.length > 0}
       <p class="driver">
-        <label>Driver
+        <label>{changes.length > 0 ? 'Driver from the start' : 'Driver'}
           <select value={detail.driver?.id ?? ''} onchange={(e) => chooseDriver(e.currentTarget.value || null)} disabled={settingDriver}>
             <option value="">Nobody yet</option>
             {#each drivers as d (d.id)}<option value={d.id}>{d.name} ({d.code})</option>{/each}
@@ -313,8 +345,26 @@
         </label>
         {#if driverError}<span class="error">{driverError}</span>{/if}
       </p>
-    {:else if detail.driver}
-      <p class="driver">Driven by <strong>{detail.driver.name}</strong> <span class="muted">({detail.driver.code})</span></p>
+      {#each changes as c (c.from)}
+        <p class="driver">
+          From lap {lapOfChange(c.from) ?? '—'}: <strong>{c.driver?.name ?? 'nobody'}</strong>
+          <button class="small" disabled={settingDriver} onclick={() => saveChanges(withoutChange(idsOf(changes), c.from))}>Remove</button>
+        </p>
+      {/each}
+      {#if laps.length > 1}
+        <p class="driver">
+          <label>Driver change at lap <input class="lapno" bind:value={changeLap} inputmode="numeric" /></label>
+          <label>to
+            <select bind:value={changeDriver}>
+              <option value="">Nobody yet</option>
+              {#each drivers as d (d.id)}<option value={d.id}>{d.name} ({d.code})</option>{/each}
+            </select>
+          </label>
+          <button disabled={settingDriver || !changeLap} onclick={addChange}>Add</button>
+        </p>
+      {/if}
+    {:else if detail.driver || changes.length > 0}
+      <p class="driver">Driven by <strong>{driversText(detail.driver, changes)}</strong>{#if changes.length === 0 && detail.driver} <span class="muted">({detail.driver.code})</span>{/if}</p>
     {/if}
     {#if s.state === 'uploading'}
       <p class="muted small">Still being uploaded: this shows what has arrived so far. Reload for more.</p>
@@ -354,11 +404,12 @@
         <section class="panel">
           <h2>Laps</h2>
           <table class="laps">
-            <thead><tr><th>Lap</th><th>Time</th>{#each sectorBests as _, i (i)}<th>S{i + 1}</th>{/each}<th></th></tr></thead>
+            <thead><tr><th>Lap</th>{#if changes.length > 0}<th>Driver</th>{/if}<th>Time</th>{#each sectorBests as _, i (i)}<th>S{i + 1}</th>{/each}<th></th></tr></thead>
             <tbody>
-              {#each laps as lap (lap.lap)}
-                <tr class:best={lap.best} class:chosen={chosenLap === lap.lap} onclick={() => showLap(lap)}>
+              {#each laps as lap (lap.end)}
+                <tr class:best={lap.best} class:chosen={chosenLap === lap.end} onclick={() => showLap(lap)}>
                   <td>{lap.lap}</td>
+                  {#if changes.length > 0}<td>{driverAt(detail.driver, changes, lap.end)?.code ?? '—'}</td>{/if}
                   <td class="time">{lapTime(lap.time)}</td>
                   {#each sectorBests as bestOf, i (i)}
                     {@const t = lap.sectors?.[i]}
@@ -422,6 +473,7 @@
   .driver { margin: 0 0 8px; }
   .naming { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 8px; }
   .driver label { display: inline-flex; gap: 8px; align-items: center; }
+  .lapno { width: 4em; }
   .laps .note { display: block; font-size: 0.8rem; white-space: nowrap; }
   .laps .note.flag { color: var(--caution); }
   .events { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 0.95rem; }

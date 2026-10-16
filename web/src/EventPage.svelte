@@ -93,7 +93,7 @@
         {:else}
           <h3>Sessions</h3>
           <ul class="sessions">
-            {#each p.sessions as s (s.id)}
+            {#each p.sessions as s (`${s.id}-${s.stretch ?? 0}`)}
               <li>
                 <a href={`/cars/${s.car}/sessions/${s.id}`}>{#if s.name}{s.name} · {/if}{carName(s.car)}, {heard(s)}</a>
                 <span>{driverLabel(s.driver)}</span>

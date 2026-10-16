@@ -53,7 +53,26 @@ public data class SessionRecord(
      * M19, which is hashed whole at `complete`.
      */
     val hashState: String? = null,
-)
+    /**
+     * Where the driver changed within the session (M27), in order: [driver]
+     * drove from its start, each change's from its moment on. None: [driver]
+     * throughout.
+     */
+    val driverChanges: List<DriverChange> = emptyList(),
+) {
+    /**
+     * Who drove a lap ending at [wall] (the tablet's `wall`, milliseconds): the
+     * last change before it ended, else [driver]. A lap is the driver's whose
+     * change came before it ended, as a race's stint (M15.2).
+     */
+    public fun driverAt(wall: Long): String? {
+        val change = driverChanges.lastOrNull { it.from < wall } ?: return driver
+        return change.driver
+    }
+}
+
+/** A driver change within a session (M27): from [from] on the tablet's `wall` (milliseconds), [driver] (null: not set). */
+public data class DriverChange(val from: Long, val driver: String?)
 
 /**
  * Where the archive's facts live (Firestore in production).
@@ -111,6 +130,9 @@ public interface SessionIndex {
 
     /** Names the session, or clears its name with null (M18.3). */
     public suspend fun setName(id: String, name: String?): Boolean
+
+    /** Sets the session's driver changes (M27), the whole list, touching nothing else; false if there's no such session. */
+    public suspend fun setDriverChanges(id: String, changes: List<DriverChange>): Boolean
 
     /** Stores [offsetMs] as the session's clock offset, or keeps the one stored if smaller (M18.1). */
     public suspend fun setClockOffset(id: String, offsetMs: Long): Boolean
@@ -232,6 +254,9 @@ public class InMemorySessionIndex : SessionIndex {
 
     override suspend fun setName(id: String, name: String?): Boolean =
         sessions.computeIfPresent(id) { _, current -> current.copy(name = name) } != null
+
+    override suspend fun setDriverChanges(id: String, changes: List<DriverChange>): Boolean =
+        sessions.computeIfPresent(id) { _, current -> current.copy(driverChanges = changes) } != null
 
     override suspend fun setClockOffset(id: String, offsetMs: Long): Boolean =
         sessions.computeIfPresent(id) { _, current -> current.copy(clockOffsetMs = minOf(current.clockOffsetMs ?: offsetMs, offsetMs)) } != null

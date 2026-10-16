@@ -4,6 +4,7 @@ import com.obd2dashboard.backend.admin.Action
 import com.obd2dashboard.backend.admin.Kind
 import com.obd2dashboard.backend.admin.Thing
 import com.obd2dashboard.backend.archive.ArchiveService
+import com.obd2dashboard.backend.archive.DriverChange
 import com.obd2dashboard.backend.archive.SessionRecord
 import com.obd2dashboard.backend.events.DriverStore
 import com.obd2dashboard.backend.registry.CarRegistry
@@ -19,6 +20,16 @@ import kotlinx.serialization.Serializable
 /** Who drove a session (M14.4): a driver's id, or null to clear it. */
 @Serializable
 data class SetDriver(val driver: String?)
+
+/** A driver change within a session (M27): from [from] on the tablet's `wall` (milliseconds), [driver] (null: not set). */
+@Serializable
+data class DriverChangeView(val from: Long, val driver: String? = null)
+
+/** A session's driver changes, the whole list (M27); empty: its driver throughout. */
+@Serializable
+data class SetDriverChanges(val changes: List<DriverChangeView> = emptyList())
+
+fun DriverChange.view(): DriverChangeView = DriverChangeView(from, driver)
 
 /**
  * **Who drove** (M14.4): public to read, set by the admin or the car's crew.
@@ -55,6 +66,24 @@ fun Route.driverRoutes(
             ?.takeIf { it.car == car.slug.value }
             ?: return@put call.respond(HttpStatusCode.NotFound, ApiError("not_found", "No such session for this car."))
         call.setDriver(record, drivers, archive, "the crew of ${car.slug.value}", onChanged)
+    }
+
+    // Driver changes (M27): the same two sign-ins, the same rule.
+    put("/api/admin/sessions/{id}/driver-changes") {
+        call.signedIn(change = true) ?: return@put
+        val record = archive.session(call.parameters["id"].orEmpty().lowercase())
+            ?: return@put call.respond(HttpStatusCode.NotFound, ApiError("not_found", "No such session."))
+        val who = call.may(Action.EDIT, Thing(Kind.CAR, record.car)) ?: return@put
+        call.setDriverChanges(record, drivers, archive, who.email, onChanged)
+    }
+
+    put("/api/cars/{slug}/sessions/{id}/driver-changes") {
+        val car = call.pathCar(registry) ?: return@put call.respond(HttpStatusCode.NotFound, ApiError("not_found", "No such car."))
+        if (!call.isCrew(crewAuth, car)) return@put call.respond(HttpStatusCode.Unauthorized, ApiError("auth", "Log in with the crew passcode."))
+        val record = archive.session(call.parameters["id"].orEmpty().lowercase())
+            ?.takeIf { it.car == car.slug.value }
+            ?: return@put call.respond(HttpStatusCode.NotFound, ApiError("not_found", "No such session for this car."))
+        call.setDriverChanges(record, drivers, archive, "the crew of ${car.slug.value}", onChanged)
     }
 
     // Names (M18.3): the same two sign-ins, the same rule for whose session it is.
@@ -112,3 +141,23 @@ private suspend fun ApplicationCall.setDriver(record: SessionRecord, drivers: Dr
     onChanged()
     respond(SetDriver(driver?.id))
 }
+
+private suspend fun ApplicationCall.setDriverChanges(record: SessionRecord, drivers: DriverStore, archive: ArchiveService, who: String, onChanged: () -> Unit) {
+    if (record.heard().source == "fake") {
+        return respond(HttpStatusCode.Conflict, ApiError("fake", "This session is test data; nobody drove it."))
+    }
+    val changes = receive<SetDriverChanges>().changes.map { DriverChange(it.from, it.driver) }.sortedBy { it.from }
+    if (changes.map { it.from }.toSet().size != changes.size) return respond(HttpStatusCode.BadRequest, ApiError("invalid", "Two changes at one moment."))
+    if (changes.any { it.from <= 0 }) return respond(HttpStatusCode.BadRequest, ApiError("invalid", "A change is a moment on the tablet's clock."))
+    if (changes.size > MAX_CHANGES) return respond(HttpStatusCode.BadRequest, ApiError("invalid", "At most $MAX_CHANGES changes in a session."))
+    val unknown = changes.mapNotNull { it.driver }.distinct().filter { drivers.get(it) == null }
+    if (unknown.isNotEmpty()) return respond(HttpStatusCode.BadRequest, ApiError("no_driver", "No such driver."))
+    if (!archive.setDriverChanges(record.id, changes)) return respond(HttpStatusCode.NotFound, ApiError("not_found", "No such session."))
+    adminLog.info("driver changes: session {} of {}, {} by {}", record.id, record.car,
+        changes.joinToString(", ") { "${it.driver ?: "nobody"} from ${it.from}" }.ifEmpty { "none" }, who)
+    onChanged()
+    respond(SetDriverChanges(changes.map { it.view() }))
+}
+
+/** Driver changes in one session: far more than any day's racing has. */
+private const val MAX_CHANGES = 50

@@ -33,6 +33,10 @@ describe('laps', () => {
     expect(rows[1]).toMatchObject({ start: t0 + 200_000 - 94_500, end: t0 + 200_000 })
     expect(rows[2]).toMatchObject({ pitIn: true, pitOut: false })
   })
+  it('are in the order driven when the numbers start again (app 1.0.1, STREAM off and on)', () => {
+    const rows = lapRows(series({ events: { stopped: [], fault: [], gap: [], lap: [[100_000, { lap: 1, time: 90 }], [600_000, { lap: 1, time: 91 }], [200_000, { lap: 2, time: 92 }]] } }))
+    expect(rows.map((r) => [r.lap, r.time])).toEqual([[1, 90], [2, 92], [1, 91]])
+  })
   it('have no best when every lap is a pit lap, or there are none', () => {
     expect(lapRows(series({ events: { stopped: [], fault: [], gap: [], lap: [[1, { lap: 1, time: 90, pitIn: true }]] } })).some((r) => r.best)).toBe(false)
     expect(lapRows(series())).toEqual([])

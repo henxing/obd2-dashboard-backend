@@ -175,7 +175,7 @@ class LiveTimings(
         trace.tabletLaps.mapNotNull { lap ->
             val end = lap.endAt ?: lap.at ?: return@mapNotNull null
             LiveLap(end + offset, lap.lap, lap.time, lap.sectors.takeIf { it.isNotEmpty() }, lap.pitIn, lap.pitOut)
-        }.sortedBy { it.lap }
+        }.sortedBy { it.wall } // as driven: the tablet counts from 1 again when STREAM is back on (app 1.0.1)
     }
 
     /** [block] over [car]'s sessions not complete, oldest first, under its lock (the traces change as records come). */

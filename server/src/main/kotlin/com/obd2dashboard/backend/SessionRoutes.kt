@@ -103,9 +103,15 @@ data class SessionDetail(
     val signals: List<SignalView> = emptyList(),
     val gaps: Int = 0,
     val missed: Long = 0,
-    /** Who drove it (M14.4); null until someone says. */
+    /** Who drove it (M14.4); null until someone says. From its start, if the driver changed within it (M27). */
     val driver: DriverView? = null,
+    /** Where the driver changed within it (M27), in order; none: [driver] throughout. */
+    val driverChanges: List<DriverChangeDetail> = emptyList(),
 )
+
+/** A driver change as a session's page shows it (M27): from [from] on the tablet's `wall`, [driver] (null: not set). */
+@Serializable
+data class DriverChangeDetail(val from: Long, val driver: DriverView? = null)
 
 /**
  * Past sessions (M7.3): public, like the live pages (decision 11), and never
@@ -191,6 +197,7 @@ fun Route.sessionRoutes(
                 gaps = summary?.gaps ?: 0,
                 missed = summary?.missed ?: 0,
                 driver = record.driver?.let { drivers?.get(it) }?.view(),
+                driverChanges = record.driverChanges.map { c -> DriverChangeDetail(c.from, c.driver?.let { drivers?.get(it) }?.view()) },
             ),
         )
     }

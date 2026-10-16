@@ -116,7 +116,10 @@ export async function fetchLaps(id: string, fetcher: typeof fetch = fetch): Prom
   return (await response.json()) as SessionLaps
 }
 
-/** Laps in order; the best is the fastest on track, never a pit lap (§18). */
+/**
+ * Laps in the order driven (by when each ended, not by number: the tablet counts again from 1 when STREAM is
+ * switched back on within a session, app 1.0.1); the best is the fastest on track, never a pit lap (§18).
+ */
 export function lapRows(series: Series): LapRow[] {
   const rows = series.events.lap
     .map(([t, r]) => {
@@ -124,7 +127,7 @@ export function lapRows(series: Series): LapRow[] {
       const sectors = Array.isArray(r.sectors) && r.sectors.every((x) => typeof x === 'number') ? r.sectors : null
       return { lap: r.lap, time: r.time, pitIn: r.pitIn === true, pitOut: r.pitOut === true, start: end - r.time * 1000, end, best: false, sectors }
     })
-    .sort((a, b) => a.lap - b.lap)
+    .sort((a, b) => a.end - b.end)
   markBest(rows)
   return rows
 }

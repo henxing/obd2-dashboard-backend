@@ -57,6 +57,8 @@ export interface SessionResult {
   live?: boolean
   /** What the admin or the crew called it (M18.3). */
   name?: string | null
+  /** Which of its drivers' stretches this row is (M27): a session whose driver changed is a row per driver. */
+  stretch?: number
 }
 
 export interface DriverBest {
