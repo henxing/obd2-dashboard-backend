@@ -226,7 +226,7 @@ describe('laps without the series (M19.4)', () => {
 
 describe('a speed’s dial (Sam, 2026-10-16: 0–120 mph in 10s)', () => {
   it('in mph: 0 to 120, a mark every 10, a number every 20; the needle on that range', () => {
-    const scale = dialScale('km/h', 'us')!
+    const scale = dialScale('vehicle.speed', 'km/h', 'us')!
     const marks = dialMarks(scale)
     expect(marks).toHaveLength(13)
     expect(marks.filter((m) => m.text !== null).map((m) => m.text)).toEqual(['0', '20', '40', '60', '80', '100', '120'])
@@ -236,8 +236,22 @@ describe('a speed’s dial (Sam, 2026-10-16: 0–120 mph in 10s)', () => {
     expect(needleAngle(300, p)).toBe(SWEEP / 2) // past 120 mph: held at the end
   })
   it('in km/h: 0 to 200; any other unit keeps its range in quarters', () => {
-    expect(dialMarks(dialScale('km/h', 'metric')!).filter((m) => m.text !== null).map((m) => m.text)).toEqual(['0', '40', '80', '120', '160', '200'])
-    expect(dialScale('rpm', 'us')).toBeNull()
+    expect(dialMarks(dialScale('vehicle.speed', 'km/h', 'metric')!).filter((m) => m.text !== null).map((m) => m.text)).toEqual(['0', '40', '80', '120', '160', '200'])
+    expect(dialScale('engine.rpm', 'rpm', 'us')).toBeNull()
     expect(scaled(profile('engine.rpm', 'rpm'), null, 'rpm', 'us')).toEqual(profile('engine.rpm', 'rpm'))
+  })
+})
+
+describe('a temperature’s dial in round numbers (Sam, 2026-10-16: "give it in round F")', () => {
+  it('coolant: 100–260 °F, 40–130 °C; its warning zones where they were', () => {
+    expect(dialMarks(dialScale('engine.coolant_temperature', '°C', 'us')!).filter((m) => m.text).map((m) => m.text)).toEqual(['100', '140', '180', '220', '260'])
+    expect(dialMarks(dialScale('engine.coolant_temperature', '°C', 'metric')!).filter((m) => m.text).map((m) => m.text)).toEqual(['40', '70', '100', '130'])
+    const p = scaled(profile('engine.coolant_temperature', '°C'), dialScale('engine.coolant_temperature', '°C', 'us'), '°C', 'us')
+    expect(p.caution).toEqual({ above: 105 }) // kept in °C, as sent
+    expect(needleAngle(82.2222, p)).toBeCloseTo(0, 2) // 180 °F, straight up
+  })
+  it('oil: 100–300 °F; another temperature keeps its range in quarters', () => {
+    expect(dialMarks(dialScale('engine.oil_temperature', '°C', 'us')!).filter((m) => m.text).map((m) => m.text)).toEqual(['100', '150', '200', '250', '300'])
+    expect(dialScale('intake.air_temperature', '°C', 'us')).toBeNull()
   })
 })

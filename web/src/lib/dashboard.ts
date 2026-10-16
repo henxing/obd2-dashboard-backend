@@ -156,8 +156,14 @@ const DIALS: Record<string, Record<System, DialScale>> = {
   'km/h': { us: { min: 0, max: 120, step: 10, label: 20 }, metric: { min: 0, max: 200, step: 20, label: 40 } },
 }
 
-export function dialScale(unit: string, system: System): DialScale | null {
-  return DIALS[unit]?.[system] ?? null
+/** By what a signal is, where its range isn't its unit's: round in °F and in °C (Sam: "give it in round F"). */
+const SIGNAL_DIALS: Record<string, Record<System, DialScale>> = {
+  'engine.coolant_temperature': { us: { min: 100, max: 260, step: 20, label: 40 }, metric: { min: 40, max: 130, step: 10, label: 30 } },
+  'engine.oil_temperature': { us: { min: 100, max: 300, step: 25, label: 50 }, metric: { min: 40, max: 160, step: 10, label: 40 } },
+}
+
+export function dialScale(signal: string, unit: string, system: System): DialScale | null {
+  return SIGNAL_DIALS[signal]?.[system] ?? DIALS[unit]?.[system] ?? null
 }
 
 /** [p] with its range as [scale] says, in the signal's own unit. */

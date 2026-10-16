@@ -40,12 +40,12 @@ export function fromShown(value: number, unit: string, system: System): number {
 
 const KEY = 'units'
 
-/** The viewer's choice, remembered in their browser; metric if none, or if storage is refused. */
+/** The viewer's choice, remembered in their browser; US if none, or if storage is refused (Sam, 2026-10-16). */
 export function loadSystem(): System {
   try {
-    return globalThis.localStorage?.getItem(KEY) === 'us' ? 'us' : 'metric'
+    return globalThis.localStorage?.getItem(KEY) === 'metric' ? 'metric' : 'us'
   } catch {
-    return 'metric'
+    return 'us'
   }
 }
 

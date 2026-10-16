@@ -7,8 +7,8 @@
 
   let { signal, unit, value, freshness }: { signal: string; unit: string; value: number | null; freshness: Freshness } = $props()
 
-  // A speed's dial in the units shown (0–120 mph); any other, its range in quarters.
-  const scale = $derived(dialScale(unit, units.system))
+  // A speed's or a temperature's dial in round numbers of the units shown (0–120 mph); any other, its range in quarters.
+  const scale = $derived(dialScale(signal, unit, units.system))
   const p = $derived(scaled(profile(signal, unit), scale, unit, units.system))
   const lv = $derived(level(value, p))
   const shown = $derived(readout(value, unit, units.system))

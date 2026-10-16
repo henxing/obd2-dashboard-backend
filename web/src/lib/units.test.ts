@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { columnShown, fromShown, shownUnit, toShown } from './units'
+import { columnShown, fromShown, loadSystem, shownUnit, toShown } from './units'
 
 describe('units', () => {
   it('shows metric as sent', () => {
@@ -40,3 +40,22 @@ describe('chart columns', () => {
   })
 })
 
+describe('the default (Sam, 2026-10-16: US unless the viewer chose metric)', () => {
+  it('is US with nothing remembered, or storage refused; metric once chosen', () => {
+    const was = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+    const store = (value: string | null) => Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: { getItem: () => value } })
+    try {
+      store(null)
+      expect(loadSystem()).toBe('us')
+      store('us')
+      expect(loadSystem()).toBe('us')
+      store('metric')
+      expect(loadSystem()).toBe('metric')
+      Object.defineProperty(globalThis, 'localStorage', { configurable: true, get: () => { throw new Error('refused') } })
+      expect(loadSystem()).toBe('us')
+    } finally {
+      if (was) Object.defineProperty(globalThis, 'localStorage', was)
+      else delete (globalThis as { localStorage?: unknown }).localStorage
+    }
+  })
+})
