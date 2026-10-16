@@ -178,7 +178,23 @@ class HiddenTest {
         val open = call(HttpMethod.Get, "/api/events/open-day").bodyAsText()
         open shouldContain "Open Car"
         // Its crew can't log in either: the car doesn't exist to them.
-        call(HttpMethod.Post, "/api/cars/secret-car/crew/login", body = """{"passcode":"anything"}""").status shouldBe HttpStatusCode.NotFound
+        call(HttpMethod.Post, "/api/cars/secret-car/login", body = """{"passcode":"anything"}""").status shouldBe HttpStatusCode.NotFound
+        // Any other request about one, routed or not, any method, is answered as for one that never was (found in production:
+        // a path no route serves was a JSON 404 for a hidden car, and routing's empty one for a car that never existed).
+        for ((method, path) in listOf(
+            HttpMethod.Get to "/api/cars/secret-car", HttpMethod.Get to "/api/cars/secret-car/nope", HttpMethod.Get to "/api/cars/secret-car/login",
+            HttpMethod.Post to "/api/cars/secret-car/login", HttpMethod.Post to "/api/cars/secret-car/messages", HttpMethod.Put to "/api/cars/secret-car/events/open-day/race",
+            HttpMethod.Get to "/api/courses/secret-course/nope", HttpMethod.Delete to "/api/courses/secret-course", HttpMethod.Get to "/api/events/secret-event/nope",
+        )) {
+            val about = never.keys.first { path.contains(it) }
+            val body = if (method == HttpMethod.Get || method == HttpMethod.Delete) null else "{}"
+            val response = call(method, path, body = body)
+            val unknown = call(method, path.replace(about, never.getValue(about)), body = body)
+            val text = response.bodyAsText()
+            val expected = unknown.bodyAsText().replace(never.getValue(about), about)
+            withClue("${method.value} $path", "status") { response.status shouldBe unknown.status }
+            withClue("${method.value} $path", "as if it never was") { text shouldBe expected }
+        }
     }
 
     @Test

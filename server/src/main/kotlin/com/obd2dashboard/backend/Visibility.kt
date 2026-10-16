@@ -7,9 +7,13 @@ import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.createApplicationPlugin
+import io.ktor.server.application.pluginOrNull
+import io.ktor.server.request.httpMethod
 import io.ktor.server.request.path
 import io.ktor.server.response.header
 import io.ktor.server.response.respond
+import io.ktor.server.routing.RoutingRoot
+import io.ktor.server.routing.getAllRoutes
 import io.ktor.util.AttributeKey
 import java.time.Clock
 import java.time.Duration
@@ -91,6 +95,18 @@ private val THING_PATH = Regex("^/api/(cars|courses|events)/([^/]+)(/.*)?$")
  */
 val HideFromSignedOut = createApplicationPlugin("HideFromSignedOut") {
     fun isPublicApi(path: String) = path.startsWith("/api/") && !path.startsWith("/api/admin/")
+    // Every route as (method, path pattern), once routing is installed: a path no route serves is left to
+    // routing's own empty 404, which is what one that never existed gets there too.
+    val routes by lazy {
+        application.pluginOrNull(RoutingRoot)?.getAllRoutes().orEmpty().map { node ->
+            val s = node.toString()
+            val method = Regex("\\(method:([A-Z]+)\\)").find(s)?.groupValues?.get(1)
+            val path = s.replace(Regex("/\\([^)]*\\)"), "")
+            val pattern = path.split("/").joinToString("/") { if (it.startsWith("{")) "[^/]+" else Regex.escape(it) }
+            method to Regex("^$pattern$")
+        }
+    }
+    fun routed(method: String, path: String) = routes.any { (m, p) -> (m == null || m == method) && p.matches(path) }
     onCallRespond { call, _ ->
         if (!isPublicApi(call.request.path())) return@onCallRespond
         if (call.response.headers[HttpHeaders.CacheControl] == null) call.response.header(HttpHeaders.CacheControl, "private, no-cache")
@@ -107,7 +123,7 @@ val HideFromSignedOut = createApplicationPlugin("HideFromSignedOut") {
             else -> hidden.event(id)
         }
         // Word for word what each route says of one that never was, so a hidden one can't be told apart.
-        if (gone) {
+        if (gone && routed(call.request.httpMethod.value, path)) {
             val message = when {
                 plural != "cars" -> "No such ${plural.removeSuffix("s")}."
                 path.endsWith("/live") -> "No car \"$id\"."
