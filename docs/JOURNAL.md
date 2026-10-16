@@ -502,3 +502,17 @@ whole drive, the admin page's Download.
   while Cloud Build ran, the server logging nothing about it (no Ping
   timeout, no shutdown); the cutover after was a clean `1012`. As before
   (2026-09-30), this machine busy uploading the build.
+
+## 2026-10-16 — M27, driver changes; the live map's freeze
+
+- **A keyed list with a repeated key stops the whole update.** The car page
+  threw Svelte's `each_key_duplicate` on every batch and the map stopped,
+  while the gauges (updated apart) went on: one session's laps were numbered
+  1–6 then 1–10 (app 1.0.1 counts again after STREAM off and on). Found in
+  the console of the live page, not from the server, whose feed was fine.
+- **Gradle doesn't rerun a test whose inputs it doesn't see:** the real-log
+  test read the app's folder, and failed only when `:archive` changed, nine
+  days after the files that broke it arrived.
+- **The dev server's crew login** was typed into by a password manager's
+  overlay, which then blocked the tab; logged in by the page's own request
+  instead.

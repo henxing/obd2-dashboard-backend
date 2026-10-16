@@ -887,7 +887,8 @@ records carry.
 - **Who drove** is set per session on its page, by the admin or **the car's
   crew** (the passcode they use for messages), each change logged with who;
   public to read. Two routes, one rule, because each sign-in's cookie reaches
-  only its own paths.
+  only its own paths. *Since M27 (2026-10-16) the driver can change within a
+  session: decision 44.*
 - **Practice results are public and computed on view**: the laps as they
   stand on the event's course and layout (decision 33), each driver's best on
   track (§18), the best of each sector (§22.6's in- and out-lap rule), per
@@ -1139,3 +1140,30 @@ session and driver).
 been refused (over 30 hours), bridged the night with a 16-hour lap counted in
 everyone's laps and time, and had nowhere for Saturday's chequered flag or
 Sunday's green.
+
+## 44. Driver changes within a session
+
+**Decision.** (M27; amends decision 34's one driver per session.) A session
+can say **where its driver changed**: the session's driver from its start,
+then each change's from its moment (the tablet's `wall`) on. A lap is the
+driver's whose change came before it ended, as a race stint's (decision 35).
+- **Set on the session's page** at a lap's start, by whoever may set its
+  driver (its car's editors, a master admin, its crew); and from the car's
+  live page by the crew: **once the session has laps, "Who's driving" is a
+  change from now**, at the tablet's own clock (its newest record's `wall`).
+- **Everything that reads who drove reads it per lap:** practice results a
+  row per driver's stretch; race default stints start at each change (edited
+  stints still win); the live standing; drivers' pages; a driver who drove
+  only after a change isn't removed.
+- **Not separate sessions**, nor parts landing in different parts of an
+  event (Sam, 2026-10-16: the split is for "a driver change").
+
+**Why.** The tablet starts a session only when the car stops answering, and
+since app v1.0.1 not even across a pit stop with the power off while
+streaming; a driver change in the pits is one session. Sam: "we stop/started
+a stream, but it just picked up the session".
+
+**And: laps are known by when they ended, never by number.** The tablet
+counts laps from 1 again when STREAM is switched back on, within one session
+(app 1.0.1). Keyed by number, the car page threw on every update and its
+map froze (Sam: "the dot is frozen"), 2026-10-16.

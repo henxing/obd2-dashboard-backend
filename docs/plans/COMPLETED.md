@@ -823,3 +823,31 @@ Decision 43.
   break, 560 s, a stint each; "race lap 5" on Sunday's first lap; Sunday's
   green saved from the page to Sunday only); deployed as `00044` with a live
   stream across it (`1012`, reconnected at once).
+
+## M27 — Driver changes within a session  ✅ 2026-10-16
+
+Decision 44.
+
+- **The record:** `SessionRecord.driverChanges` (`DriverChange(from, driver)`,
+  `driverAt`), in memory and Firestore.
+- **The routes:** `PUT /api/admin/sessions/{id}/driver-changes` and the
+  crew's `/api/cars/{slug}/sessions/{id}/driver-changes`, the whole list,
+  checked; the session's detail carries them.
+- **The readers:** `Results.stretches` (practice rows per driver,
+  `SessionResult.stretch`), `Race.car`'s `changes`, `Standings.of`'s
+  `changes`, a driver's removal.
+- **The site:** the session page's changes and Driver column, "Driven by
+  Sam, then Alex"; the live picker's change from now; `lib/driverChanges.ts`.
+- **Tests:** `SessionDriverTest`, `SessionMappingTest`, `DriverRoutesTest`,
+  `RaceTest`, `EventResultsTest`, `StandingsTest`, `EventRoutesTest`,
+  `HiddenTest`; Vitest 4 new.
+- **Found:** an event's results `500`d when a session with no driver set got
+  a change (`null == null` in `stretches`), on the dev server.
+- **In the same deploy:** the live map's freeze (laps keyed by when they
+  ended; decision 44) and an old sign-in cookie moving itself to `/api`.
+- **Proven:** on the dev server (a change at lap 3 from the session page,
+  practice two rows and each driver's page his own; the crew's change from
+  now mid-stream on the tablet's timing lane; race stints split at a change;
+  a drive numbered 1, 2, 1, 2 with the map following and no errors);
+  deployed as `00045` with a live stream across it (`1012`, reconnected at
+  once).
