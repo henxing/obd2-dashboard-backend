@@ -108,6 +108,14 @@ fun Route.adminSignInRoutes(auth: AdminAuth, config: AdminConfig) {
 
     get("/api/admin/me") {
         val who = call.signedIn(change = false) ?: return@get
+        // A sign-in from before M25 is kept at /api/admin, so the public API never sees it and hides from its own
+        // admin what's hidden. Every page asks here: the same cookie again at /api, for the time it has left, and
+        // none at the old path. Signing in again isn't needed.
+        val value = call.request.cookies[AdminAuth.COOKIE]
+        auth.secondsLeft(value)?.let { left ->
+            call.response.cookies.append(cookie(value!!, left.toInt()))
+            call.response.cookies.append(cookie("", 0, OLD_PATH))
+        }
         call.respond(AdminMe(who.email, who.role.wire))
     }
 }

@@ -142,6 +142,24 @@ class AdminAuthTest {
     }
 
     @Test
+    fun `a sign-in from before M25, at the admin API's path only, moves to the whole API when a page asks who's signed in`() = testApplication {
+        app()
+        // Issued 10 days ago: 20 days left, and moving it never gives it more.
+        val tenDaysAgo = AdminAuth(testCrewKey(), Clock.fixed(Instant.now().minus(Duration.ofDays(10)), ZoneOffset.UTC)).issue("sam@example.com")
+        val response = client.get("/api/admin/me") { header(HttpHeaders.Cookie, "${AdminAuth.COOKIE}=$tenDaysAgo") }
+        response.status shouldBe HttpStatusCode.OK
+        val cookies = response.headers.getAll(HttpHeaders.SetCookie)!!
+        val moved = cookies.single { it.contains("Path=/api;") }
+        moved shouldContain "${AdminAuth.COOKIE}=$tenDaysAgo;"
+        val maxAge = Regex("Max-Age=(\\d+)").find(moved)!!.groupValues[1].toLong()
+        (maxAge in Duration.ofDays(20).seconds - 60..Duration.ofDays(20).seconds) shouldBe true
+        moved shouldContain "HttpOnly"
+        cookies.single { it.contains("Path=/api/admin") } shouldContain "Max-Age=0"
+        // Not signed in: nothing set.
+        client.get("/api/admin/me").headers.getAll(HttpHeaders.SetCookie) shouldBe null
+    }
+
+    @Test
     fun `a refused sign-in is 401, and says so plainly for another account`() = testApplication {
         app()
         signIn("stranger").let {

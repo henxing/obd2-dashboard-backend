@@ -73,6 +73,13 @@ class AdminAuth(private val key: ByteArray, private val clock: Clock = Clock.sys
         return runCatching { String(Base64.getUrlDecoder().decode(parts[1])) }.getOrNull()
     }
 
+    /** How long [cookie] has left, in seconds, if [emailOf] accepts it: to send it again at a new path, never longer. */
+    fun secondsLeft(cookie: String?): Long? {
+        if (emailOf(cookie) == null) return null
+        val expiry = cookie!!.split('.')[2].toLong()
+        return expiry - clock.instant().epochSecond
+    }
+
     private fun sign(body: String): String {
         val mac = Mac.getInstance("HmacSHA256").apply { init(SecretKeySpec(key, "HmacSHA256")) }
         return b64.encodeToString(mac.doFinal(body.toByteArray()))
