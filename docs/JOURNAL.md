@@ -516,3 +516,20 @@ whole drive, the admin page's Download.
 - **The dev server's crew login** was typed into by a password manager's
   overlay, which then blocked the tab; logged in by the page's own request
   instead.
+
+## 2026-10-16 — NHMS's start/finish line was too short
+
+- **Laps went missing when cars ran wide of a 24 m line.** At the October
+  practice, from mid-afternoon, passes went 4–29 m beyond the start/finish
+  line's outer end: the tablet and re-timing both missed them (a lap of two
+  or three, and one driver's last six laps were two). Measured against the
+  session's positions: every lap before had crossed 60–80% along the line.
+  **NHMS version 6** extends it 40 m on that side (the pit lane passes the
+  other end), checked by the course rules and against the day's track: all
+  29 passes count. Re-timing gave the session 32 laps for 24.
+- **A course saved with `admin.sh import-course` doesn't tell connected
+  tablets at once** (only a save through the site does); they find it at
+  their next `hello`, or from a `course` frame naming the newer version.
+- **A start/finish line wants to span the whole width a car may use there,
+  with room**: a line drawn across one lane of a wide straight times laps
+  until someone takes a different line.
