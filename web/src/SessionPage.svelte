@@ -441,7 +441,7 @@
             </tbody>
           </table>
           </div>
-          <p class="muted small">{#if hasSpeeds}Top, lowest and average speed in {shownUnit('km/h', units.system)}. {/if}Choose a lap to zoom the chart to it. {#if chosenLap !== null || focus !== null}<button class="link" onclick={showAll}>Show the whole session</button>{/if}</p>
+          <p class="muted small">{#if hasSpeeds}Top, lowest and average speed in {shownUnit('km/h', units.system)}.{/if} Choose a lap to zoom the chart to it. {#if chosenLap !== null || focus !== null}<button class="link" onclick={showAll}>Show the whole session</button>{/if}</p>
         </section>
       {/if}
 
