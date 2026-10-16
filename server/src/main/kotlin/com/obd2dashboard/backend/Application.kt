@@ -149,6 +149,9 @@ fun Application.module(
         },
     )
 
+    // Hidden things (M25): a public path about one is a 404 to someone signed out.
+    install(HideFromSignedOut)
+
     routing {
         // Not /healthz: Cloud Run's front end reserves paths ending in "z" and
         // answers them with its own 404 before the request reaches us.

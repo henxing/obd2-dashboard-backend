@@ -41,6 +41,9 @@ data class CourseSummary(
     /** Signed in only (M23): who made it, who edits it, and what the caller may do. Never written when null, so public lists never carry it, even as `null`. */
     @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
     val access: AccessView? = null,
+    /** Hidden (M25), said only to someone signed in. */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val hidden: Boolean = false,
 )
 
 /** [thing]'s access as [who] sees it; null if they may not edit it, so it's left out of their list. */
@@ -51,7 +54,16 @@ data class LayoutSummary(val id: String, val name: String, val default: Boolean,
 
 /** One version of a course, whole. */
 @Serializable
-data class CourseView(val id: String, val name: String, val version: Int, val saved: Long, val geojson: JsonObject)
+data class CourseView(
+    val id: String,
+    val name: String,
+    val version: Int,
+    val saved: Long,
+    val geojson: JsonObject,
+    /** Hidden (M25), said only to someone signed in. */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val hidden: Boolean = false,
+)
 
 /** A version in a course's history. */
 @Serializable
@@ -196,7 +208,9 @@ private fun problemsOf(id: String?, name: String, geojson: JsonObject): List<Str
  */
 fun Route.publicCourseRoutes(courses: CourseStore) {
     get("/api/courses") {
-        call.respond(courses.current().map { it.summary() })
+        val hidden = call.hidden()
+        val marks = call.hiddenMarks()
+        call.respond(courses.current().filterNot { hidden.course(it.id) }.map { it.summary().copy(hidden = marks.course(it.id)) })
     }
 
     get("/api/courses/{id}") {
@@ -204,13 +218,15 @@ fun Route.publicCourseRoutes(courses: CourseStore) {
         val version = call.request.queryParameters["version"]?.toIntOrNull()
         val course = id?.let { courses.get(it, version) }
             ?: return@get call.respond(HttpStatusCode.NotFound, ApiError("not_found", "No such course."))
-        call.respond(course.view())
+        call.respond(course.view().copy(hidden = call.hiddenMarks().course(course.id)))
     }
 
     get("/api/courses/{id}/versions") {
         val id = call.parameters["id"]?.takeIf { CourseRules.idProblem(it) == null }
             ?: return@get call.respond(HttpStatusCode.NotFound, ApiError("not_found", "No such course."))
-        call.respond(courses.versions(id).map { CourseVersion(it.version, it.name, it.saved.toEpochMilli()) }.reversed())
+        // None: no such course, as for the course itself (and as for a hidden one, M25).
+        val versions = courses.versions(id).ifEmpty { return@get call.respond(HttpStatusCode.NotFound, ApiError("not_found", "No such course.")) }
+        call.respond(versions.map { CourseVersion(it.version, it.name, it.saved.toEpochMilli()) }.reversed())
     }
 }
 

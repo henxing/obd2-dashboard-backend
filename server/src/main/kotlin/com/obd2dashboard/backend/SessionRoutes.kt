@@ -130,9 +130,10 @@ fun Route.sessionRoutes(
     liveLaps: suspend (car: String, id: String) -> List<LiveLap>? = { _, _ -> null },
 ) {
     /** The events and parts [car]'s sessions are in, by session id. */
-    suspend fun eventsOf(car: String, records: List<SessionRecord>): Map<String, EventRef> {
+    /** Each of [car]'s sessions in an event, by session; an event hidden from this request (M25) not named. */
+    suspend fun eventsOf(car: String, records: List<SessionRecord>, hidden: Hidden = Hidden.NOTHING): Map<String, EventRef> {
         val heard = records.map { it.heard() }
-        return events?.list().orEmpty().filter { car in it.cars }.flatMap { e ->
+        return events?.list().orEmpty().filter { car in it.cars && !hidden.event(it.id) }.flatMap { e ->
             EventRules.sessionsIn(e, heard).flatMap { (partId, ids) ->
                 val part = e.parts.first { it.id == partId }
                 ids.map { it to EventRef(e.id, e.name, part.name) }
@@ -170,7 +171,7 @@ fun Route.sessionRoutes(
         val live = hub.status(car.slug.value).liveSession()
         // A session the live lane announced has no archived lines for its first minutes: listed while live.
         val records = archive.sessionsOf(car.slug.value)
-        val inEvents = eventsOf(car.slug.value, records)
+        val inEvents = eventsOf(car.slug.value, records, call.hidden())
         val items = records.filter { it.ackedThrough >= 0 || it.id == live }.map { item(it, live, inEvents[it.id]) }
         call.respond(drives(items))
     }
@@ -180,9 +181,10 @@ fun Route.sessionRoutes(
         val record = call.sessionRecord(archive, allowLive = hub) ?: return@get
         val car = registry.get(Slug.parse(record.car)) ?: return@get call.respond(HttpStatusCode.NotFound, ApiError("not_found", "No such session."))
         val summary = if (record.complete) archive.summary(record.id) else null
+        val hidden = call.hidden()
         call.respond(
             SessionDetail(
-                session = item(record, hub.status(record.car).liveSession(), eventsOf(record.car, archive.sessionsOf(record.car))[record.id]),
+                session = item(record, hub.status(record.car).liveSession(), eventsOf(record.car, archive.sessionsOf(record.car), hidden)[record.id]),
                 car = car.slug.value,
                 carName = car.name,
                 signals = summary?.signals.orEmpty().map { SignalView(it.name, it.unit, it.kind) },
@@ -212,7 +214,9 @@ fun Route.sessionRoutes(
         // A session in an event is timed on the event's course (M16.1); else the course its laps name, else the first touched.
         val event = eventsOf(record.car, archive.sessionsOf(record.car))[record.id]?.let { events?.get(it.id) }
         val timed = event?.let { laps(record.car, record.id, it.course) } ?: laps(record.car, record.id, null)
-        call.respond(timed ?: return@get call.respond(HttpStatusCode.NoContent))
+            ?: return@get call.respond(HttpStatusCode.NoContent)
+        // Timed as ever, on a hidden event's course too (M25); a course hidden from this request isn't named.
+        call.respond(if (call.hidden().course(timed.course)) timed.copy(course = "", courseName = "") else timed)
     }
 
     get("/api/sessions/{id}/series") {
@@ -257,6 +261,8 @@ private suspend fun io.ktor.server.application.ApplicationCall.sessionRecord(
     val raw = parameters["id"].orEmpty()
     val record = (if (SessionIds.isValid(raw)) archive.session(SessionIds.normalise(raw)) else null)
         ?.takeIf { it.ackedThrough >= 0 || (allowLive != null && allowLive.status(it.car).liveSession() == it.id) }
+        // A hidden car's sessions are hidden with it (M25).
+        ?.takeIf { !hidden().car(it.car) }
     if (record == null) respond(HttpStatusCode.NotFound, ApiError("not_found", "No such session."))
     return record
 }

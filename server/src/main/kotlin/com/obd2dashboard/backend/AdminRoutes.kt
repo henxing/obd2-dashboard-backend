@@ -84,6 +84,7 @@ fun Route.adminSignInRoutes(auth: AdminAuth, config: AdminConfig) {
                 }
                 adminLog.info("sign-in: {} ({})", email, role.wire)
                 call.response.cookies.append(cookie(auth.issue(email), AdminAuth.LIFETIME.seconds.toInt()))
+                call.response.cookies.append(cookie("", 0, OLD_PATH)) // one from before M25, at the old path, goes
                 call.respond(AdminMe(email, role.wire))
             }
             is SignIn.Refused -> {
@@ -101,6 +102,7 @@ fun Route.adminSignInRoutes(auth: AdminAuth, config: AdminConfig) {
     delete("/api/admin/login") {
         if (!call.fromOurPage()) return@delete call.respond(HttpStatusCode.Forbidden, ApiError("origin", "Changes must come from this site."))
         call.response.cookies.append(cookie("", 0))
+        call.response.cookies.append(cookie("", 0, OLD_PATH))
         call.respond(HttpStatusCode.NoContent)
     }
 
@@ -110,16 +112,22 @@ fun Route.adminSignInRoutes(auth: AdminAuth, config: AdminConfig) {
     }
 }
 
-/** HttpOnly, Secure, SameSite=Strict, and sent only to the admin API. */
-private fun cookie(value: String, maxAge: Int) = Cookie(
+/**
+ * HttpOnly, Secure, SameSite=Strict, and sent only to the API: the admin API, and since M25 the public one too,
+ * which leaves out what's hidden from anyone not signed in. Never with a page or an asset.
+ */
+private fun cookie(value: String, maxAge: Int, path: String = "/api") = Cookie(
     name = AdminAuth.COOKIE,
     value = value,
     maxAge = maxAge,
-    path = "/api/admin",
+    path = path,
     secure = true,
     httpOnly = true,
     extensions = mapOf("SameSite" to "Strict"),
 )
+
+/** Where the sign-in cookie was kept before M25: cleared at each sign-in and sign-out. */
+private const val OLD_PATH = "/api/admin"
 
 /** A car as the admin page sees it: never a token or a hash, only the token's hint. */
 @Serializable

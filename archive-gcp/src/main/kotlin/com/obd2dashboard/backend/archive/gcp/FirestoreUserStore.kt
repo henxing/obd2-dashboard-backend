@@ -106,17 +106,21 @@ public class FirestoreAccessStore(private val db: Firestore) : AccessStore {
         public const val COLLECTION: String = "access"
         private const val CREATOR = "creator"
         private const val EDITORS = "editors"
+        private const val HIDDEN = "hidden"
 
         public fun connect(projectId: String): FirestoreAccessStore = FirestoreAccessStore(usersFirestore(projectId))
 
         internal fun Access.toFields(): Map<String, Any> = mapOf(
             CREATOR to creator.normalEmail(),
             EDITORS to editors.map { it.normalEmail() }.distinct().sorted(),
+            HIDDEN to hidden,
         )
 
         internal fun accessFrom(data: Map<String, Any?>): Access = Access(
             creator = data[CREATOR] as? String ?: "",
             editors = (data[EDITORS] as? List<*>).orEmpty().filterIsInstance<String>().toSet(),
+            // A record from before M25 has no such field: visible.
+            hidden = data[HIDDEN] as? Boolean ?: false,
         )
     }
 }

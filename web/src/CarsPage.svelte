@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { fetchCars, type CarSummary } from './lib/api'
+  import HiddenBadge from './HiddenBadge.svelte'
   import { stateLabel } from './lib/state'
   import { signin } from './lib/signin'
   import { AdminError, api, slugProblem, tokenProblem, twiceProblem, type CarWithToken } from './lib/admin'
@@ -97,7 +98,7 @@
     {#each cars as car (car.slug)}
       <li>
         <div class="head">
-          <a class="name" href={`/cars/${car.slug}`}>{car.name}</a>
+          <a class="name" href={`/cars/${car.slug}`}>{car.name}</a>{#if car.hidden}<HiddenBadge />{/if}
           <span class="state"><span class={`dot ${car.state}`}></span>{stateLabel[car.state]}</span>
         </div>
         <div class="links">

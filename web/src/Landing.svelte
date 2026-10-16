@@ -4,7 +4,8 @@
   import { fetchCars, type CarSummary } from './lib/api'
   import type { CourseSummary, CourseView } from './lib/admin'
   import { fromGeoJSON, type EditCourse } from './lib/courseEdit'
-  import type { PublicEvent } from './lib/eventResults'
+  import { whereText, type PublicEvent } from './lib/eventResults'
+  import HiddenBadge from './HiddenBadge.svelte'
   import type { Driver } from './lib/events'
   import { eventsShown, latestSession, layoutsLine, sessionLine, underWay } from './lib/landing'
   import { badge, fetchDrives, type SessionItem } from './lib/sessions'
@@ -104,7 +105,7 @@
         <li>
           <a href={`/cars/${car.slug}`}>
             <span class="top">
-              <span class="name">{car.name}</span>
+              <span class="name">{car.name}{#if car.hidden}<HiddenBadge />{/if}</span>
               <span class="state"><span class={`dot ${car.state}`}></span>{stateLabel[car.state]}</span>
             </span>
             {#if s}
@@ -129,9 +130,9 @@
       <ul class="list">
         {#each eventsShown(events) as e (e.id)}
           <li>
-            <a href={`/events/${e.id}`}><strong>{e.name}</strong></a>
+            <a href={`/events/${e.id}`}><strong>{e.name}</strong></a>{#if e.hidden}<HiddenBadge />{/if}
             {#if underWay(e, now)}<span class="under-way"><span class="dot live"></span>Under way</span>{/if}
-            <span class="muted small">{e.date} · {e.courseName}, {e.layoutName}{e.cars.length ? ` · ${e.cars.map((c) => c.name).join(', ')}` : ''}</span>
+            <span class="muted small">{[e.date, whereText(e), e.cars.map((c) => c.name).join(', ')].filter(Boolean).join(' · ')}</span>
           </li>
         {/each}
       </ul>
@@ -168,7 +169,7 @@
             <a href={`/courses/${c.id}`}>
               <!-- A picture, not a map to move: the page scrolls past it, and the card is the link. -->
               <span class="mini" aria-hidden="true">{#if drawing}<CourseMap course={drawing} layout={defaultLayout(drawing)} />{/if}</span>
-              <strong>{c.name}</strong>
+              <strong>{c.name}{#if c.hidden}<HiddenBadge />{/if}</strong>
               <span class="muted small">{layoutsLine(c)}</span>
             </a>
           </li>

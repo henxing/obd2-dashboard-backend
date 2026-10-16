@@ -28,6 +28,13 @@ class UserMappingTest {
     }
 
     @Test
+    fun `hidden round-trips, and a record from before M25 reads as shown`() {
+        val hidden = Access("ann@example.com", hidden = true)
+        accessFrom(hidden.toFields()) shouldBe hidden
+        accessFrom(mapOf("creator" to "ann@example.com", "editors" to listOf<String>())) shouldBe Access("ann@example.com")
+    }
+
+    @Test
     fun `thing keys are document ids Firestore accepts as they are`() {
         listOf("car:outback", "event:nhms-october", "course:nhms", "driver:d-0a1b2c3d").all { isDocumentId(it) } shouldBe true
         isDocumentId("ann@example.com") shouldBe true

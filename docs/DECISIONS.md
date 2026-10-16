@@ -590,7 +590,10 @@ rate-limit failed tablet logins, or go back to generated tokens only.
 - **The sign-in is a cookie**, `adm1.<email>.<expiry>.<hmac>`, with the crew
   key under its own tag: `HttpOnly`, `Secure`, `SameSite=Strict`,
   `Path=/api/admin`, 30 days (Sam). **The allowlist is checked on every
-  request**, so removing an email ends that sign-in at once.
+  request**, so removing an email ends that sign-in at once. *`Path=/api`
+  since M25 (2026-10-15): the public API leaves hidden things out for anyone
+  not signed in, so it has to know who is. Still never sent with a page or an
+  asset.*
 - **Every change must come from our own page** (its `Origin` must name the
   host), on top of `SameSite=Strict` and JSON-only bodies. `/admin` can't be
   framed (`X-Frame-Options: DENY`, `frame-ancestors 'none'`).

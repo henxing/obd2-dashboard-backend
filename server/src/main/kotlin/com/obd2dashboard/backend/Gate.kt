@@ -31,6 +31,9 @@ class Gate(
     val users: UserStore,
     val access: AccessStore,
 ) {
+    /** Every hidden thing (M25), held a few seconds. */
+    val hidden = HiddenThings(access)
+
     /** Who [cookie] belongs to now, or null. */
     suspend fun who(cookie: String?): Who? {
         val email = auth.emailOf(cookie)?.normalEmail() ?: return null
@@ -49,7 +52,10 @@ class Gate(
     suspend fun created(thing: Thing, who: Who) = access.set(thing, Access(who.email))
 
     /** [thing] was deleted: its record goes with it. */
-    suspend fun deleted(thing: Thing) = access.remove(thing)
+    suspend fun deleted(thing: Thing) {
+        access.remove(thing)
+        hidden.forget()
+    }
 
     companion object {
         val KEY = AttributeKey<Gate>("Gate")

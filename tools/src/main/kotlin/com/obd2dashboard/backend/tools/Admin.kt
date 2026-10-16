@@ -108,7 +108,7 @@ class Admin(
         subcommands(
             AddCar(io), RotateToken(io), SetToken(io), SetPasscode(io), Rename(), ListCars(), RemoveCar(io),
             ListSessions(), ShowSession(), DeleteSession(io), ImportCourse(), RemoveCourse(io), ListDrivers(), ListEvents(), AddDriver(), RemoveDriver(io), ImportEvent(), RemoveEvent(io),
-            ListUsers(), AddUser(), RemoveUser(io), Share(), Unshare(),
+            ListUsers(), AddUser(), RemoveUser(io), Share(), Unshare(), Hide(hidden = true), Hide(hidden = false),
         )
     }
 
@@ -708,6 +708,28 @@ class Unshare : CliktCommand(name = "unshare") {
         if (current == null || address !in current.editors) throw CliktError("$address doesn't edit $thing.")
         tools.access.set(thing, current.withoutEditor(address))
         echo("$address no longer edits $thing.")
+    }
+}
+
+/**
+ * Hides a car, event or course from anyone not signed in, or shows it again (M25), as its creator does on the
+ * site. The site sees it within seconds.
+ */
+class Hide(private val hidden: Boolean) : CliktCommand(name = if (hidden) "hide" else "show") {
+    private val tools: Tools by requireObject<Tools>()
+    private val kind by argument(help = "car, event or course")
+    private val id by argument()
+
+    override fun help(context: Context) =
+        if (hidden) "Hide a car, event or course: only signed-in users see it." else "Show a hidden car, event or course to everyone again."
+
+    override fun run() = runBlocking {
+        val thing = tools.thingOf(kind, id)
+        if (thing.kind == Kind.DRIVER) throw CliktError("A driver can't be hidden: their page leaves out what's hidden.")
+        val current = tools.access.get(thing) ?: Access("")
+        if (current.hidden == hidden) throw CliktError("$thing is already ${if (hidden) "hidden" else "shown"}.")
+        tools.access.set(thing, current.copy(hidden = hidden))
+        echo(if (hidden) "$thing is hidden: only signed-in users see it." else "$thing is shown to everyone.")
     }
 }
 

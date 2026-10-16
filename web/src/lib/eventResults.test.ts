@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { driverLabel, gap, sectorGap, windowText, partOn } from './eventResults'
+import { driverLabel, gap, sectorGap, windowText, partOn, whereText } from './eventResults'
 
 describe('an event’s results (M14.5)', () => {
   it('the gap to the fastest, to the millisecond', () => {
@@ -31,5 +31,12 @@ describe('the page refreshing itself (M17.6)', () => {
     expect(partOn(parts, 2_000)).toBe(false)
     expect(partOn(parts, 5_500)).toBe(true)
     expect(partOn([], 1_500)).toBe(false)
+  })
+})
+
+describe('where an event is (M25)', () => {
+  it('names the course and layout, and nothing for a course hidden from you', () => {
+    expect(whereText({ course: 'nhms', courseName: 'NHMS', layoutName: 'Road Course' })).toBe('NHMS, Road Course')
+    expect(whereText({ course: '', courseName: '', layoutName: '' })).toBe('')
   })
 })

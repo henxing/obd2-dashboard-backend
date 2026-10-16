@@ -541,6 +541,19 @@ class AdminTest {
     }
 
     @Test
+    fun `hide keeps a thing from anyone signed out, and show brings it back, its editors kept (M25)`() {
+        run("add-car yaris --name Yaris").statusCode shouldBe 0
+        run("add-user ann@example.com")
+        run("share car yaris ann@example.com")
+        run("hide car yaris").let { it.statusCode shouldBe 0; it.stdout shouldContain "only signed-in users see it" }
+        runBlocking { access.get(car) } shouldBe com.obd2dashboard.backend.admin.Access("", setOf("ann@example.com"), hidden = true)
+        run("hide car yaris").let { it.statusCode shouldBe 1; it.stderr shouldContain "already hidden" }
+        run("hide car nope").let { it.statusCode shouldBe 1; it.stderr shouldContain "No car nope" }
+        run("show car yaris").statusCode shouldBe 0
+        runBlocking { access.get(car)?.hidden } shouldBe false
+    }
+
+    @Test
     fun `list shows each car's creator, a car with no record being a master admin's`() {
         run("add-car yaris --name Yaris")
         run("list").stdout.lines().first { it.startsWith("yaris") } shouldContain "(master)"

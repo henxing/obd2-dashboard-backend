@@ -1,12 +1,14 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte'
   import CourseMap from './CourseMap.svelte'
+  import HiddenBadge from './HiddenBadge.svelte'
   import { signin } from './lib/signin'
   import { allowedFor, NOTHING, type Allowed } from './lib/access'
   import { day, type CourseVersion, type CourseView } from './lib/admin'
   import { fromGeoJSON, metres, sectorsOf, type EditCourse } from './lib/courseEdit'
 
-  // One course (M12.5), public: its map, its layouts and sectors, and its versions.
+  // One course (M12.5), public: its map, its layouts and sectors. Signed in, also its versions and whether
+  // its start/finish is still a guess (Sam, 2026-10-15: that's for whoever edits it).
   let { id }: { id: string } = $props()
   let view: CourseView | null = $state(null)
   let course: EditCourse | null = $state.raw(null)
@@ -33,6 +35,12 @@
 
   const lengthOf = (path: [number, number][]) => Math.round(path.slice(1).reduce((s, p, i) => s + metres(path[i]!, p), 0))
 
+  const signedIn = $derived($signin.state === 'in')
+  // Signed out while looking at an older version: back to the latest, the only one shown then.
+  $effect(() => {
+    if (!signedIn && view && latest && view.version !== latest) void load()
+  })
+
   // Edit only for a course you may edit (M23): the admin list has only those.
   let may: Allowed = $state(NOTHING)
   $effect(() => {
@@ -46,12 +54,14 @@
   {#if missing}
     <h1>No such course</h1>
   {:else if view && course}
-    <h1>{view.name}</h1>
+    <h1>{view.name}{#if view.hidden}<HiddenBadge />{/if}</h1>
     {#if may.edit}<p><a class="button" href={`/courses/${id}/edit`}>Edit</a></p>{/if}
-    <p class="muted">
-      Version {view.version}{view.version !== latest ? ` (the latest is ${latest})` : ''}, {day(view.saved)}
-      {#if course.startFinish.some((s) => s.extra.guess === true)} · <span class="guess">start/finish not yet checked at the track</span>{/if}
-    </p>
+    {#if signedIn}
+      <p class="muted">
+        Version {view.version}{view.version !== latest ? ` (the latest is ${latest})` : ''}, {day(view.saved)}
+        {#if course.startFinish.some((s) => s.extra.guess === true)} · <span class="guess">start/finish not yet checked at the track</span>{/if}
+      </p>
+    {/if}
     <div class="layouts">
       {#each course.layouts as l (l.id)}
         <button class:chosen={l.id === layout} onclick={() => (layout = l.id)}>
@@ -60,7 +70,7 @@
       {/each}
     </div>
     <CourseMap {course} {layout} />
-    {#if versions.length > 1}
+    {#if signedIn && versions.length > 1}
       <h2>Versions</h2>
       <ul class="versions">
         {#each versions as v (v.version)}

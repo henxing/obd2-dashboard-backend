@@ -26,7 +26,7 @@ import kotlinx.serialization.Serializable
  * beyond editing it.
  */
 @Serializable
-data class AccessView(val creator: String?, val editors: List<String>, val canShare: Boolean, val canDelete: Boolean)
+data class AccessView(val creator: String?, val editors: List<String>, val canShare: Boolean, val canDelete: Boolean, val hidden: Boolean = false)
 
 /** [access] as [who] sees it, or null if [who] may not edit it, so a list leaves it out. */
 fun accessView(who: Who, access: Access?): AccessView? {
@@ -36,15 +36,20 @@ fun accessView(who: Who, access: Access?): AccessView? {
         editors = access?.editors.orEmpty().sorted(),
         canShare = Permissions.may(who, Action.SHARE, access),
         canDelete = Permissions.may(who, Action.DELETE, access),
+        hidden = access?.hidden == true,
     )
 }
 
 /** What a thing's editors are, for its creator or a master admin choosing them. */
 @Serializable
-data class AccessDetail(val creator: String?, val editors: List<String>, val invitable: List<String>)
+data class AccessDetail(val creator: String?, val editors: List<String>, val invitable: List<String>, val hidden: Boolean = false)
 
 @Serializable
 data class SetEditors(val editors: List<String>)
+
+/** Hidden or shown (M25): only signed-in users see a hidden thing. */
+@Serializable
+data class SetHidden(val hidden: Boolean)
 
 /** An invited user, for a master admin: who invited them, when, and what they made. */
 @Serializable
@@ -80,6 +85,7 @@ fun Route.adminAccessRoutes(clock: Clock = Clock.systemUTC()) {
                 creator = creator,
                 editors = access?.editors.orEmpty().sorted(),
                 invitable = gate.users.list().map { it.email }.filter { it != creator },
+                hidden = access?.hidden == true,
             ),
         )
     }
@@ -102,11 +108,27 @@ fun Route.adminAccessRoutes(clock: Clock = Clock.systemUTC()) {
             return@put call.respond(HttpStatusCode.BadRequest, ApiError("refused", problems.joinToString(" ")))
         }
         // A thing with no record (made before M23) gets one, still a master admin's: its creator stays unknown.
-        val saved = Access(access?.creator ?: "", editors)
+        val saved = (access ?: Access("")).copy(editors = editors)
         gate.access.set(thing, saved)
         adminLog.info("editors set: {} to {} by {}", thing, editors.sorted(), who.email)
         val creator = access?.creator?.ifEmpty { null }
-        call.respond(AccessDetail(creator, editors.sorted(), gate.users.list().map { it.email }.filter { it != creator }))
+        call.respond(AccessDetail(creator, editors.sorted(), gate.users.list().map { it.email }.filter { it != creator }, saved.hidden))
+    }
+
+    // Hidden or shown (M25), by whoever chooses its editors. A driver is never hidden: their page leaves out what is.
+    put("/api/admin/access/{kind}/{id}/hidden") {
+        val thing = call.thing() ?: return@put
+        if (thing.kind == Kind.DRIVER) return@put call.respond(HttpStatusCode.BadRequest, ApiError("refused", "A driver can't be hidden."))
+        val who = call.may(Action.SHARE, thing) ?: return@put
+        val gate = call.application.gate
+        val access = gate.access.get(thing)
+        val hidden = call.receive<SetHidden>().hidden
+        val saved = (access ?: Access("")).copy(hidden = hidden)
+        gate.access.set(thing, saved)
+        gate.hidden.forget()
+        adminLog.info("{} {} by {}", thing, if (hidden) "hidden" else "shown", who.email)
+        val creator = access?.creator?.ifEmpty { null }
+        call.respond(AccessDetail(creator, saved.editors.sorted(), gate.users.list().map { it.email }.filter { it != creator }, saved.hidden))
     }
 
     get("/api/admin/users") {

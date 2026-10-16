@@ -5,6 +5,7 @@
   } from './lib/eventResults'
   import { lapTime } from './lib/sessions'
   import RaceSection from './RaceSection.svelte'
+  import HiddenBadge from './HiddenBadge.svelte'
   import { signin } from './lib/signin'
   import { allowedFor, NOTHING, type Allowed } from './lib/access'
   import { lapLink } from './lib/laps'
@@ -60,9 +61,11 @@
     <p class="error">Could not load the event: {error}</p>
   {:else if results}
     {@const e = results.event}
-    <h1>{e.name}</h1>
+    <h1>{e.name}{#if e.hidden}<HiddenBadge />{/if}</h1>
     {#if may.edit}<p><a class="button" href={`/events/${id}/edit`}>Edit</a></p>{/if}
-    <p class="muted">{e.date} · <a href={`/courses/${e.course}`}>{e.courseName}</a>, {e.layoutName} · {e.cars.map((c) => c.name).join(', ')}</p>
+    <p class="muted">
+      {e.date}{#if e.course} · <a href={`/courses/${e.course}`}>{e.courseName}</a>, {e.layoutName}{/if}{#if e.cars.length} · {e.cars.map((c) => c.name).join(', ')}{/if}
+    </p>
 
     {#if results.parts.some((p) => p.part.kind === 'practice')}
       <section class="panel">

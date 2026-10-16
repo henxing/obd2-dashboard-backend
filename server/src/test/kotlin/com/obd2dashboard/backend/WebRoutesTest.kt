@@ -54,7 +54,7 @@ class WebRoutesTest {
         for (path in listOf("/api/admin/me", "/api/admin/config", "/api/admin/cars", "/api/admin/nope")) {
             client.get(path).headers[HttpHeaders.CacheControl] shouldBe "no-store"
         }
-        client.get("/api/cars").headers[HttpHeaders.CacheControl] shouldBe null // the public API is unchanged
+        client.get("/api/cars").headers[HttpHeaders.CacheControl] shouldBe "private, no-cache" // the public API differs by sign-in (M25)
     }
 
     @Test

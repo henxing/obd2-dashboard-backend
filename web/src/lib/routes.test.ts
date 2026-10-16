@@ -60,11 +60,11 @@ describe('fetchCars', () => {
   it('reads unknown states as offline', async () => {
     const fake = (async () => new Response(JSON.stringify([
       { slug: 'yaris', name: 'Yaris', state: 'live' },
-      { slug: 'odd', name: 'Odd', state: 'warp' },
+      { slug: 'odd', name: 'Odd', state: 'warp', hidden: true },
     ]))) as unknown as typeof fetch
     expect(await fetchCars(fake)).toEqual([
-      { slug: 'yaris', name: 'Yaris', state: 'live' },
-      { slug: 'odd', name: 'Odd', state: 'offline' },
+      { slug: 'yaris', name: 'Yaris', state: 'live', hidden: false },
+      { slug: 'odd', name: 'Odd', state: 'offline', hidden: true }, // hidden: said only to someone signed in (M25)
     ])
   })
   it('throws on a failed request', async () => {

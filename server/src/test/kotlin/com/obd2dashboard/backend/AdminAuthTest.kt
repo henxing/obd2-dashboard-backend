@@ -122,14 +122,16 @@ class AdminAuthTest {
         }
 
     @Test
-    fun `signing in sets a strict cookie for the admin API, and me names who`() = testApplication {
+    fun `signing in sets a strict cookie for the API, clears one at the old path, and me names who`() = testApplication {
         app()
         val response = signIn("good")
         response.status shouldBe HttpStatusCode.OK
         response.bodyAsText() shouldContain "\"email\":\"sam@example.com\""
         val setCookie = response.headers[HttpHeaders.SetCookie]!!
         setCookie shouldContain "admin="
-        setCookie shouldContain "Path=/api/admin"
+        setCookie shouldContain "Path=/api;"
+        // The public API reads it too since M25 (hidden things); one at the admin API's path from before is cleared.
+        response.headers.getAll(HttpHeaders.SetCookie)!!.single { it.contains("Path=/api/admin") } shouldContain "Max-Age=0"
         setCookie shouldContain "HttpOnly"
         setCookie shouldContain "Secure"
         setCookie shouldContain "SameSite=Strict"

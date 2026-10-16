@@ -19,6 +19,8 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 
 /** A part as anyone sees it: no hand-made lists, which are the admin's. */
@@ -42,6 +44,9 @@ data class PublicEvent(
     val parts: List<PublicPart>,
     /** The event's revision: what an edit to its race names (M15.4). */
     val revision: Int = 0,
+    /** Hidden (M25), said only to someone signed in. */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val hidden: Boolean = false,
 )
 
 /** A session in an event's results: its laps as they stand on the event's course. */
@@ -220,8 +225,21 @@ fun Route.publicEventRoutes(
         )
     }
 
+    /**
+     * [event] as someone [hidden] from sees it (M25): without hidden cars (their sessions and stints go with
+     * them) and without naming a hidden course. Results are held per what's seen, so no one is sent another's.
+     */
+    fun seen(event: Event, hidden: Hidden): Event =
+        if (event.cars.none(hidden::car)) event
+        else event.copy(cars = event.cars.filterNot(hidden::car), parts = event.parts.map { p -> p.copy(stints = p.stints.filterKeys { !hidden.car(it) }) })
+
+    fun PublicEvent.naming(hidden: Hidden): PublicEvent =
+        if (hidden.course(course)) copy(course = "", courseName = "", layout = "", layoutName = "") else this
+
     get("/api/events") {
-        call.respond(stores.events.list().map { public(it) })
+        val hidden = call.hidden()
+        val marks = call.hiddenMarks()
+        call.respond(stores.events.list().filterNot { hidden.event(it.id) }.map { public(seen(it, hidden)).naming(hidden).copy(hidden = marks.event(it.id)) })
     }
 
     /** An event's results (M14.5, M15.4): practice from each session's laps, the race as one timeline. */
@@ -295,24 +313,33 @@ fun Route.publicEventRoutes(
         )
     }
 
+    suspend fun results(event: Event, hidden: Hidden): EventResults {
+        val shown = seen(event, hidden)
+        val results = held.get(shown) { eventResults(shown) }
+        return if (hidden.course(event.course)) results.copy(event = results.event.naming(hidden)) else results
+    }
+
     get("/api/events/{id}") {
         val event = stores.events.get(call.parameters["id"].orEmpty())
             ?: return@get call.respond(HttpStatusCode.NotFound, ApiError("not_found", "No such event."))
-        call.respond(held.get(event) { eventResults(event) })
+        val results = results(event, call.hidden())
+        call.respond(if (call.hiddenMarks().event(event.id)) results.copy(event = results.event.copy(hidden = true)) else results)
     }
 
     get("/api/drivers/{id}") {
         val driver = stores.drivers.get(call.parameters["id"].orEmpty())
             ?: return@get call.respond(HttpStatusCode.NotFound, ApiError("not_found", "No such driver."))
-        val events = stores.events.list().map { e ->
-            val results = held.get(e) { eventResults(e) }
+        val hidden = call.hidden()
+        val events = stores.events.list().filterNot { hidden.event(it.id) }.map { e ->
+            val results = results(e, hidden)
             val practice = results.parts.filter { it.part.kind == "practice" }.flatMap { p ->
                 p.bests.filter { it.driver?.id == driver.id }.map { DriverPracticeBest(p.part.name, it) }
             }
             val stints = results.race?.cars.orEmpty().flatMap { c -> c.stints.filter { it.driver == driver.id }.map { DriverStint(c.car, it) } }
             DriverEvent(results.event, practice, stints)
         }.filter { it.practice.isNotEmpty() || it.stints.isNotEmpty() }
-        val byCourse = events.flatMap { e -> e.practice.map { e.event to it.best } }
+        // A hidden course's best isn't listed (its events still are, without naming it).
+        val byCourse = events.filter { it.event.course.isNotEmpty() }.flatMap { e -> e.practice.map { e.event to it.best } }
             .groupBy { (e, _) -> e.course }
             .map { (course, bests) -> bests.minBy { (_, b) -> b.lap.time }.let { (e, b) -> CourseBest(course, e.courseName, e.id, b) } }
             .sortedBy { it.courseName }

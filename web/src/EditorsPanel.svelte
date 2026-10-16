@@ -41,6 +41,20 @@
     saved = false
   }
 
+  // Hidden (M25): saved at once, apart from the editors. A driver is never hidden.
+  const canHide = $derived(kind !== 'driver')
+  async function setHidden(hidden: boolean) {
+    busy = true
+    error = null
+    try {
+      sharing = await api<Sharing>('PUT', `/access/${kind}/${id}/hidden`, { hidden })
+    } catch (e) {
+      error = e instanceof Error ? e.message : String(e)
+    } finally {
+      busy = false
+    }
+  }
+
   async function save() {
     busy = true
     error = null
@@ -85,6 +99,13 @@
       <button class="primary" onclick={save} disabled={busy || !changed}>Save editors</button>
       {#if saved && !changed}<span class="muted small">Saved.</span>{/if}
     </div>
+    {#if canHide}
+      <label class="check small">
+        <input type="checkbox" checked={sharing.hidden === true} disabled={busy} onchange={(e) => setHidden((e.currentTarget as HTMLInputElement).checked)} />
+        Only signed-in users can see this
+      </label>
+      {#if sharing.hidden}<p class="muted small">Hidden: to anyone not signed in it doesn't exist{kind === 'car' ? ', its sessions and live feed included, and its crew code doesn’t open it' : ''}.</p>{/if}
+    {/if}
   {/if}
   {#if error}<p class="error small" role="alert">{error}</p>{/if}
 </section>
@@ -103,6 +124,7 @@
   button.primary { border-color: var(--accent); color: var(--accent); font-weight: 600; }
   button.danger { color: var(--critical); border-color: var(--critical); }
   .small { font-size: 0.85rem; }
+  .check { display: flex; align-items: center; gap: 6px; }
   .hint { color: var(--caution); }
   .error { color: var(--critical); }
 </style>

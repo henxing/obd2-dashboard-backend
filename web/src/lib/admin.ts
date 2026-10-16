@@ -194,6 +194,8 @@ export interface CourseSummary {
   layouts: { id: string; name: string; default: boolean; sectors: number }[]
   /** In the admin list only (M23). */
   access?: ItemAccess
+  /** Said only to someone signed in (M25). */
+  hidden?: boolean
 }
 
 /** One version of a course, whole. */
@@ -203,6 +205,8 @@ export interface CourseView {
   version: number
   saved: number
   geojson: Record<string, unknown>
+  /** Said only to someone signed in (M25). */
+  hidden?: boolean
 }
 
 export interface CourseVersion {

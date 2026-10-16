@@ -68,6 +68,8 @@ export interface Sharing {
   editors: string[]
   /** Every invited user but the creator. */
   invitable: string[]
+  /** Only signed-in users see it (M25); never a driver. */
+  hidden?: boolean
 }
 
 export const normal = (email: string) => email.trim().toLowerCase()

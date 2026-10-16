@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte'
+  import HiddenBadge from './HiddenBadge.svelte'
   import { signin } from './lib/signin'
   import type { CourseSummary } from './lib/admin'
 
@@ -27,7 +28,7 @@
     <ul class="list">
       {#each courses as c (c.id)}
         <li>
-          <a href={`/courses/${c.id}`}><strong>{c.name}</strong></a>
+          <a href={`/courses/${c.id}`}><strong>{c.name}</strong></a>{#if c.hidden}<HiddenBadge />{/if}
           <span class="muted small">
             {c.layouts.map((l) => `${l.name}${l.sectors > 0 ? `, ${l.sectors} sector${l.sectors === 1 ? '' : 's'}` : ''}`).join(' · ')}
           </span>

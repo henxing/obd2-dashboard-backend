@@ -22,6 +22,8 @@ import java.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -34,7 +36,14 @@ import kotlinx.serialization.json.put
 
 /** A car on the landing page: public, so named fields only (never a `Car`), and its live state. */
 @Serializable
-data class CarSummary(val slug: String, val name: String, val state: String)
+data class CarSummary(
+    val slug: String,
+    val name: String,
+    val state: String,
+    /** Hidden (M25), said only to someone signed in. */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val hidden: Boolean = false,
+)
 
 /**
  * The website's data: the landing page's list, and each car's live stream.
@@ -44,7 +53,12 @@ data class CarSummary(val slug: String, val name: String, val state: String)
 fun Route.browserRoutes(registry: CarRegistry, hub: LiveHub, clock: Clock, auth: CrewAuth, crew: CrewMessages) {
     get("/api/cars") {
         val now = clock.instant()
-        call.respond(registry.list().map { CarSummary(it.slug.value, it.name, hub.status(it.slug.value).freshness(now).wire) })
+        val hidden = call.hidden()
+        val marks = call.hiddenMarks()
+        call.respond(
+            registry.list().filterNot { hidden.car(it.slug.value) }
+                .map { CarSummary(it.slug.value, it.name, hub.status(it.slug.value).freshness(now).wire, marks.car(it.slug.value)) },
+        )
     }
 
     route("/api/cars/{slug}/live") {

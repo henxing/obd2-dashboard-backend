@@ -28,6 +28,13 @@ export interface PublicEvent {
   parts: PublicPart[]
   /** What an edit to the race names (M15.4). */
   revision: number
+  /** Said only to someone signed in (M25). */
+  hidden?: boolean
+}
+
+/** "NHMS, Road Course": where it is; nothing for a course hidden from you (M25), which isn't named. */
+export function whereText(e: Pick<PublicEvent, 'course' | 'courseName' | 'layoutName'>): string {
+  return e.course ? `${e.courseName}, ${e.layoutName}` : ''
 }
 
 export interface SessionResult {

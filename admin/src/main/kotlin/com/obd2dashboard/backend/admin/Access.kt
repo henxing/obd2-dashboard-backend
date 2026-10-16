@@ -42,8 +42,11 @@ public data class Thing(val kind: Kind, val id: String) {
     }
 }
 
-/** A thing's creator, and the users they chose to edit it. Emails lower case. */
-public data class Access(val creator: String, val editors: Set<String> = emptySet()) {
+/**
+ * A thing's creator, and the users they chose to edit it. Emails lower case.
+ * [hidden] (M25): only someone signed in sees it; to anyone else it doesn't exist.
+ */
+public data class Access(val creator: String, val editors: Set<String> = emptySet(), val hidden: Boolean = false) {
     public fun withEditor(email: String): Access = copy(editors = editors + email.normalEmail())
     public fun withoutEditor(email: String): Access = copy(editors = editors - email.normalEmail())
 }
