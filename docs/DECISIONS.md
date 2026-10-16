@@ -877,7 +877,8 @@ records carry.
   2–4 capitals, unique; a driver who drove stays (rename instead).
 - **An event** is at one course and layout, with the cars entered, **any
   number of practice parts and at most one race**, each a window of time,
-  never overlapping, none over 30 hours.
+  never overlapping, none over 30 hours. *Since M26 (2026-10-16) the race
+  can be several race parts, one race in sessions: decision 43.*
 - **A session is in a part by the server's time**: its car entered, the
   server hearing it (`created` to `updated`) during the window; the part it
   overlaps most if two; **plus by hand, minus by hand**, and by hand wins.
@@ -1112,3 +1113,29 @@ planned for now). New things are visible.
 visible to logged in users". A tester's car or a course being drawn needn't
 be public before it's ready. Answering exactly as for a missing thing is
 what makes hidden mean hidden: a different `404` would say it exists.
+
+## 43. A race in sessions
+
+**Decision.** (M26; amends decision 34's one race part per event.) An event's race
+can be run **in sessions**: several race parts, in time order, are one race
+(Sam, 2026-10-16: practice Friday, "one race with 2 race sessions" Saturday
+and Sunday, the car off track overnight, Sunday a rolling start with a fresh
+session and driver).
+- **One timeline across them:** laps numbered through; **no lap across the
+  break** between two sessions (a restart of the app *within* one is still
+  bridged); time is each session's added up, so the night never counts;
+  classified as before, **most laps, then least time** (Sam: "most laps
+  across both").
+- **Each session has its own green and chequered flag and its own stints**,
+  as the store already kept them per part; **a stint never crosses a
+  session**. An edit names its session (`part`); without one, a lone race
+  part is meant.
+- **The tablet's race lap count goes on** into the next session, and says
+  nothing of the race until that session's first lap, as at a race's start.
+- **An event can span days:** an optional `endDate`. A part is still at
+  most 30 hours: a session is a day's racing.
+
+**Why.** One race with an overnight stop. As one race part it would have
+been refused (over 30 hours), bridged the night with a 16-hour lap counted in
+everyone's laps and time, and had nowhere for Saturday's chequered flag or
+Sunday's green.

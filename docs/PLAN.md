@@ -40,7 +40,7 @@ Where this plan and the contract disagree, the contract wins. Fix the plan.
 | **M23** | Users: invited by the master admin; each car, event, course and driver edited by its creator and whoever they add, deleted only by its creator or the master | **planned**: [`plans/M23-USERS.md`](plans/M23-USERS.md) |
 | **M24** | "GPS lost": a banner on the car's live page when it's moving with no position for 30 s, and each gap noted on a session's page | **deployed** (00040): [`plans/M24-GPS-LOST.md`](plans/M24-GPS-LOST.md) |
 | **M25** | Hidden: a car, course or event only signed-in users see; to anyone else it doesn't exist, and a hidden car is left out of events | **deployed** (00043): decision 42, [`plans/COMPLETED.md`](plans/COMPLETED.md) |
-| **M26** | A race in sessions: one race over several race parts (Saturday and Sunday), no lap across the night, most laps across them all; events over several days | **built**, not deployed: [`plans/M26-RACE-SESSIONS.md`](plans/M26-RACE-SESSIONS.md) |
+| **M26** | A race in sessions: one race over several race parts (Saturday and Sunday), no lap across the night, most laps across them all; events over several days | **deployed** (00044): decision 43, [`plans/COMPLETED.md`](plans/COMPLETED.md) |
 
 **How a milestone runs**, as in the app:
 - A plan in `docs/plans/` sketches every step.

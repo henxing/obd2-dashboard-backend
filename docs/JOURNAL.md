@@ -489,3 +489,16 @@ whole drive, the admin page's Download.
   route serves, and passed only because the plugin answered everything.
 - **Two `1012`s across one deploy** (`00043`), each reconnected at once;
   `00042` gave one.
+
+## 2026-10-16 — M26, a race in sessions
+
+- **The tablet's view needs a stream, not only results:** the results were
+  right in tests, but streaming Sunday's drive with the timing lane showed
+  the standing describing Saturday's stint until Sunday's first crossing.
+- **A running dev server keeps the site it started with:** rebuilding the
+  site under it (a test run) left its page pointing at assets it no longer
+  served, a blank page. Restart it after a rebuild.
+- **A `1006` mid-build** (`00044`): the stream's socket closed after 171 s
+  while Cloud Build ran, the server logging nothing about it (no Ping
+  timeout, no shutdown); the cutover after was a clean `1012`. As before
+  (2026-09-30), this machine busy uploading the build.

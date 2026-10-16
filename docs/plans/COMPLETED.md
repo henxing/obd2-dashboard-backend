@@ -795,3 +795,31 @@ Decision 42 (and decision 25's cookie path).
   once); on production, a throwaway car hidden: gone from the list, and
   every read about it, routed or not, the same as for a car that never
   existed, while it kept streaming.
+
+## M26 — A race in sessions: practice Friday, the race Saturday and Sunday  ✅ 2026-10-16
+
+Decision 43.
+
+- **The race over sessions** (`Race.sessions`, `RaceSessionInput`,
+  `CarRace.sessions` / `RaceSessionSpan`): each session timed as a race was,
+  then joined; one session is exactly the race as before.
+- **Events:** several race parts (`Event.races`; `Event.race` its first),
+  `endDate` (Firestore only when set; `admin.sh import-event` and `events`);
+  `RaceResults` per session (its part, flags, edited stints); flag and stint
+  edits name their `part`; the live standing over every race session so far.
+- **The site:** "The race" with each session's flags, a flags row and an
+  "Edit … stints" per session, a Session column, each session's start marked
+  in the laps; the editor's last day and "Add a race session"; date ranges on
+  the lists and pages.
+- **Tests:** `RaceTest` 5 new (the 8 before unchanged), `EventRulesTest`,
+  `EventMappingTest`, `RaceRoutesTest`, `StandingsTest` (Sunday's count, and
+  nothing before its first lap), `EventResultsTest` (a two-session race
+  end to end), `AdminTest`; Vitest 4 new.
+- **Found on the dev server:** before Sunday's first crossing the tablet was
+  told Saturday's stint was going on; now nothing of the race until the
+  session has a lap.
+- **Proven:** on the dev server (two drives, Saturday's uploaded and
+  Sunday's streamed with the timing lane: 8 laps through, none across the
+  break, 560 s, a stint each; "race lap 5" on Sunday's first lap; Sunday's
+  green saved from the page to Sunday only); deployed as `00044` with a live
+  stream across it (`1012`, reconnected at once).
