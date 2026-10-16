@@ -8,8 +8,9 @@
   let { rows, bestSectors }: { rows: LapRow[]; bestSectors?: (number | null)[] } = $props()
 
   const s = $derived(lapSummary(rows))
-  // The newest by when they ended, and keyed so: lap numbers repeat within a session (app 1.0.1, STREAM off and on).
-  const recent = $derived([...rows].sort((a, b) => b.end - a.end).slice(0, 8))
+  // Every lap, the newest first by when they ended, and keyed so: lap numbers repeat within a session (app 1.0.1,
+  // STREAM off and on). About eight show; the rest scroll (Sam, 2026-10-16).
+  const recent = $derived([...rows].sort((a, b) => b.end - a.end))
   const bests = $derived(sectorBests(rows, bestSectors))
 </script>
 
@@ -22,6 +23,7 @@
       <div class="time" class:slower={s.delta !== null && s.delta > 0}>{s.delta === null ? '—' : `${s.delta > 0 ? '+' : s.delta < 0 ? '−' : '±'}${Math.abs(s.delta).toFixed(3)}`}</div>
     </div>
   </div>
+  <div class="scroll">
   <table>
     <tbody>
       {#each recent as lap (lap.end)}
@@ -31,6 +33,7 @@
       {/each}
     </tbody>
   </table>
+  </div>
 </section>
 
 <style>
@@ -40,6 +43,7 @@
   .time { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
   .time.best { color: var(--in-range); }
   .time.slower { color: var(--caution); }
+  .scroll { max-height: 16.5rem; overflow-y: auto; overscroll-behavior: contain; }
   table { border-collapse: collapse; width: 100%; font-size: 0.95rem; }
   td { padding: 4px 6px; border-top: 1px solid var(--line); }
   .t { font-variant-numeric: tabular-nums; font-weight: 600; }
