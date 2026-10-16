@@ -30,6 +30,7 @@
   import { merge } from './lib/merge'
   import { color, translucent } from './lib/theme'
   import { fetchSeries, joined, type Series } from './lib/sessionPage'
+  import { historySamples, lapSpeeds, seriesSamples, type LapSpeed } from './lib/lapSpeeds'
 
   let { slug }: { slug: string } = $props()
 
@@ -123,6 +124,14 @@
   })
 
   const laps = $derived(held !== null ? lapsFromLive(held, live.history) : lapsFrom(lapSeries ?? archived, live.history))
+  // Each lap's speeds: from the session's series once loaded, else the live history, kept once found (the
+  // history forgets after five minutes); a lap from before the page opened has none until the series loads.
+  // Keyed by when each lap ended, on the wall clock, so laps of different sessions never share one.
+  const keptSpeeds = new Map<number, LapSpeed>()
+  const lapSpeedMap = $derived.by(() => {
+    const from = lapSeries ?? archived
+    return lapSpeeds(laps, [...(from ? [seriesSamples(from)] : []), historySamples(live.history)], keptSpeeds)
+  })
 
   // The chart redraws at most every half second (a second for the whole session): the eye cannot use
   // more, and a phone should not work harder.
@@ -252,7 +261,7 @@
     {#if live.standing}<StandingPanel standing={live.standing} {serverNow} />{/if}
     {#if crew && liveId}<DriverPicker {slug} session={liveId} current={live.standing?.driver?.code} hasLaps={laps.length > 0}
       nowWall={() => (live.history.at(-1)?.rec.wall as number | undefined) ?? null} />{/if}
-    {#if laps.length > 0}<LapsPanel rows={laps} bestSectors={live.standing?.bestSectors} />{/if}
+    {#if laps.length > 0}<LapsPanel rows={laps} bestSectors={live.standing?.bestSectors} speeds={lapSpeedMap} />{/if}
     <section class="dash statuses">
       {#each dash.statuses as n (n)}<Status signal={n} rec={live.latest[n]} freshness={current(n)} />{/each}
       <Faults {codes} />

@@ -3,15 +3,22 @@
   import type { LapRow } from '../lib/sessionPage'
   import { lapTime } from '../lib/sessions'
   import { sectorBests } from '../lib/standing'
+  import type { LapSpeed } from '../lib/lapSpeeds'
+  import { shownUnit, toShown } from '../lib/units'
+  import { units } from '../lib/unitsState.svelte'
 
   // The laps as the tablet sends them, with their sectors (M17.5); each sector's best marked, the event's if known.
-  let { rows, bestSectors }: { rows: LapRow[]; bestSectors?: (number | null)[] } = $props()
+  // Each lap's top and average speed (km/h) by when it ended, where known.
+  let { rows, bestSectors, speeds }: { rows: LapRow[]; bestSectors?: (number | null)[]; speeds?: Map<number, LapSpeed | null> } = $props()
 
   const s = $derived(lapSummary(rows))
   // Every lap, the newest first by when they ended, and keyed so: lap numbers repeat within a session (app 1.0.1,
   // STREAM off and on). About eight show; the rest scroll (Sam, 2026-10-16).
   const recent = $derived([...rows].sort((a, b) => b.end - a.end))
   const bests = $derived(sectorBests(rows, bestSectors))
+  const hasSpeeds = $derived(speeds !== undefined && [...speeds.values()].some((x) => x !== null))
+  const speedUnit = $derived(shownUnit('km/h', units.system))
+  const speedText = (v: number | null | undefined) => (v == null ? '' : Math.round(toShown(v, 'km/h', units.system)).toString())
 </script>
 
 <section class="laps">
@@ -25,15 +32,19 @@
   </div>
   <div class="scroll">
   <table>
+    <thead><tr><th>Lap</th><th>Time</th>{#each bests as _, i (i)}<th>S{i + 1}</th>{/each}{#if hasSpeeds}<th title="Top speed">Top</th><th title="Average speed">Avg</th>{/if}<th></th></tr></thead>
     <tbody>
       {#each recent as lap (lap.end)}
+        {@const sp = speeds?.get(lap.end)}
         <tr class:best={lap.best}><td>{lap.lap}</td><td class="t">{lapTime(lap.time)}</td>
           {#each bests as b, i (i)}<td class="s" class:sbest={b !== null && lap.sectors?.[i] === b}>{lap.sectors?.[i]?.toFixed(3) ?? ''}</td>{/each}
+          {#if hasSpeeds}<td class="v">{speedText(sp?.max)}</td><td class="v">{speedText(sp?.avg)}</td>{/if}
           <td class="muted">{lap.best ? 'Best' : lap.pitIn ? 'Into the pits' : lap.pitOut ? 'Out of the pits' : ''}</td></tr>
       {/each}
     </tbody>
   </table>
   </div>
+  {#if hasSpeeds}<p class="unit">Top and average speed in {speedUnit}.</p>{/if}
 </section>
 
 <style>
@@ -49,5 +60,8 @@
   .t { font-variant-numeric: tabular-nums; font-weight: 600; }
   tr.best .t { color: var(--in-range); }
   .s { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.85rem; }
+  th { text-align: left; color: var(--muted); font-weight: 600; font-size: 0.75rem; padding: 2px 6px; position: sticky; top: 0; background: var(--panel); }
+  .v { font-variant-numeric: tabular-nums; font-size: 0.85rem; }
+  .unit { color: var(--muted); font-size: 0.75rem; margin: 6px 0 0; }
   .s.sbest { color: var(--in-range); font-weight: 600; }
 </style>

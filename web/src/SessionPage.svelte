@@ -17,7 +17,8 @@
   import type { LapPick } from './lib/comparePick'
   import ComparePick from './ComparePick.svelte'
   import { merge } from './lib/merge'
-  import { columnShown, shownUnit } from './lib/units'
+  import { columnShown, shownUnit, toShown } from './lib/units'
+  import { lapSpeeds, seriesSamples } from './lib/lapSpeeds'
   import { units } from './lib/unitsState.svelte'
   import UnitsSwitch from './widgets/UnitsSwitch.svelte'
   import { color, translucent } from './lib/theme'
@@ -165,6 +166,10 @@
   const laps: LapRow[] = $derived(standing ? standingRows(standing) : view ? lapRows(view) : [])
   // Each sector's best on track (M12.7): its column's highlight.
   const sectorBests = $derived(bestSectors(laps))
+  // Each lap's top, lowest and average speed (km/h) from the series shown; a thinned one keeps the peaks.
+  const speedOf = $derived(view ? lapSpeeds(laps, [seriesSamples(view)]) : new Map())
+  const hasSpeeds = $derived([...speedOf.values()].some((x) => x !== null))
+  const speedText = (v: number | null | undefined) => (v == null ? '' : Math.round(toShown(v, 'km/h', units.system)).toString())
 
   // The course the laps were at (M12.7): its name, and its layouts' names, since new laps name a layout by id.
   let courseNames: { name: string; layouts: Record<string, string> } | null = $state(null)
@@ -403,8 +408,9 @@
       {#if laps.length > 0}
         <section class="panel">
           <h2>Laps</h2>
+          <div class="lapswide">
           <table class="laps">
-            <thead><tr><th>Lap</th>{#if changes.length > 0}<th>Driver</th>{/if}<th>Time</th>{#each sectorBests as _, i (i)}<th>S{i + 1}</th>{/each}<th></th></tr></thead>
+            <thead><tr><th>Lap</th>{#if changes.length > 0}<th>Driver</th>{/if}<th>Time</th>{#each sectorBests as _, i (i)}<th>S{i + 1}</th>{/each}{#if hasSpeeds}{@const u = shownUnit('km/h', units.system)}<th title="Top speed, {u}">Top</th><th title="Lowest speed, {u}">Low</th><th title="Average speed, {u}">Avg</th>{/if}<th></th></tr></thead>
             <tbody>
               {#each laps as lap (lap.end)}
                 <tr class:best={lap.best} class:chosen={chosenLap === lap.end} onclick={() => showLap(lap)}>
@@ -415,6 +421,10 @@
                     {@const t = lap.sectors?.[i]}
                     <td class="sector" class:bestsector={t !== undefined && t === bestOf && countsForBest(lap, i)}>{t === undefined ? '' : t.toFixed(3)}</td>
                   {/each}
+                  {#if hasSpeeds}
+                    {@const sp = speedOf.get(lap.end)}
+                    <td class="speed">{speedText(sp?.max)}</td><td class="speed">{speedText(sp?.min)}</td><td class="speed">{speedText(sp?.avg)}</td>
+                  {/if}
                   <td class="muted">
                     {lap.best ? 'Best' : lap.pitIn ? 'Into the pits' : lap.pitOut ? 'Out of the pits' : ''}
                     {#if lapNote(lap)}<span class="note" class:flag={!!lap.flag}>{lapNote(lap)}</span>{/if}
@@ -430,7 +440,8 @@
               {/each}
             </tbody>
           </table>
-          <p class="muted small">Choose a lap to zoom the chart to it. {#if chosenLap !== null || focus !== null}<button class="link" onclick={showAll}>Show the whole session</button>{/if}</p>
+          </div>
+          <p class="muted small">{#if hasSpeeds}Top, lowest and average speed in {shownUnit('km/h', units.system)}. {/if}Choose a lap to zoom the chart to it. {#if chosenLap !== null || focus !== null}<button class="link" onclick={showAll}>Show the whole session</button>{/if}</p>
         </section>
       {/if}
 
@@ -460,14 +471,15 @@
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 16px 0; }
   .pickers { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
   select { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 0.95rem; max-width: 100%; }
-  .laps { border-collapse: collapse; width: 100%; max-width: 560px; }
+  .lapswide { overflow-x: auto; }
+  .laps { border-collapse: collapse; width: 100%; max-width: 760px; }
   .laps th { text-align: left; color: var(--muted); font-weight: 600; font-size: 0.85rem; padding: 4px 8px; }
   .laps td { padding: 6px 8px; border-top: 1px solid var(--line); }
   .laps tbody tr { cursor: pointer; }
   .laps tbody tr:hover td { background: var(--bg); }
   .laps .time { font-variant-numeric: tabular-nums; font-weight: 600; }
   .laps tr.best .time { color: var(--in-range); }
-  .laps .sector { font-variant-numeric: tabular-nums; }
+  .laps .sector, .laps .speed { font-variant-numeric: tabular-nums; }
   .laps .bestsector { color: var(--in-range); font-weight: 700; }
   .laps tr.chosen td { background: var(--bg); }
   .driver { margin: 0 0 8px; }
