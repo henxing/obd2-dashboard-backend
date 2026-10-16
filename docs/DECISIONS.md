@@ -1081,3 +1081,34 @@ at hour eight as at hour one.
 these grew with the session: at 8 hours, the car page's request ran the
 server out of memory, and `complete` took 40 s against the tablet's 10 s
 timeout.
+
+## 42. Hidden: a car, course or event only signed-in users see
+
+**Decision.** (M25.) A car, course or event can be **hidden**; then only
+someone signed in sees it, any user (Sam, 2026-10-15: no teams, and none
+planned for now). New things are visible.
+- **The flag is on the access record** (`Access.hidden`, decision 25's
+  M23 records); a thing without one is visible. Whoever may share it (its
+  creator, or the master) hides or shows it, from its Editors panel or
+  `admin.sh hide` / `show`. Drivers aren't hidden.
+- **To anyone signed out, a hidden thing doesn't exist.** Every request
+  about one (`/api/cars/{slug}…`, `/api/courses/{id}…`, `/api/events/{id}…`),
+  routed or not, any method, is answered word for word as for one that never
+  existed, by one plugin before any route runs (`HideFromSignedOut`); it is
+  left out of every list. A hidden car takes its sessions, live feed and
+  crew login with it, and is left out of events and drivers' pages; an event
+  at a hidden course doesn't name it.
+- **The crew of a hidden car** are added as users and sign in: a crew code
+  doesn't open it (Sam: "whichever is easier to implement is fine").
+- **Tablets are unaffected:** `/v1/courses` has every course, and a hidden
+  car streams and records as any other.
+- **Public answers differ by sign-in**, so they're `private, no-cache` (unless
+  the route sets its own) with `Vary: Cookie`; the sign-in cookie's path is
+  `/api` (decision 25's amendment).
+- **Signed in, a hidden thing says so** (`"hidden": true`, written for no one
+  else), and the site badges it.
+
+**Why.** Sam, 2026-10-15: "if i wanted certain cars/courses/events only
+visible to logged in users". A tester's car or a course being drawn needn't
+be public before it's ready. Answering exactly as for a missing thing is
+what makes hidden mean hidden: a different `404` would say it exists.

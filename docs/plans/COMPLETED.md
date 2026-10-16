@@ -763,3 +763,35 @@ Decision 41.
 
 **Left for later:** the tablet's many tiny chunks (a question for the tablet
 side); the memory setting (decision 41).
+
+## M25 — Hidden: cars, courses and events only signed-in users see  ✅ 2026-10-16
+
+Decision 42 (and decision 25's cookie path).
+
+- **The flag** on the access record (`Access.hidden`, Firestore's field read
+  as `false` when missing); `Hidden` per request and `HiddenThings` (every
+  hidden thing, held 5 s, forgotten at once on a change through the server),
+  `server/.../Visibility.kt`.
+- **One plugin** (`HideFromSignedOut`) answers every routed request about a
+  hidden thing as for one that never existed; the lists, events, results,
+  drivers' pages and a session's laps leave hidden things out themselves.
+- **The toggle:** `PUT /api/admin/access/{kind}/{id}/hidden`, the Editors
+  panel's "Only signed-in users can see this", `admin.sh hide` / `show`; the
+  Hidden badge on lists, a course's page and an event's.
+- **Tests:** `HiddenTest` (every public route signed out against the routing
+  tree; each hidden `404` compared with one that never existed, unrouted
+  paths and other methods included; signed in; cache headers; the real
+  cookie's path), and the auth, web routes, mapping, admin tool and site's
+  tests extended.
+- **Found while building:** the sign-in cookie at `Path=/api/admin` never
+  reached a public read (the dev server, not the tests, which set it by
+  hand); an unknown course's versions were `[]`, now `404`. **Found in
+  production:** a path no route serves under a hidden car answered with a
+  JSON `404`, routing's empty one for a car that never was; now the same
+  (`00043`).
+- **Proven:** on the dev server (a hidden car replayed into, signed out and
+  in; a hidden course still in `/v1/courses`); deployed as `00042` and
+  `00043`, each with a live stream across it (clean `1012`, reconnected at
+  once); on production, a throwaway car hidden: gone from the list, and
+  every read about it, routed or not, the same as for a car that never
+  existed, while it kept streaming.

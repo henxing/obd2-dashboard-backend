@@ -472,3 +472,20 @@ whole drive, the admin page's Download.
   points. The editor shows the server's check live, so it blocks the save.
   Every course on the site passed it; the two versions the tablet had choked
   on were refused.
+
+## 2026-10-16 — M25, hidden
+
+- **Tests that set a cookie by hand can't find its path.** Hidden things were
+  hidden from everyone, signed in included: the sign-in cookie was
+  `Path=/api/admin` and a browser never sent it to the public API. The unit
+  tests passed, putting the cookie on each request themselves; the dev server
+  in a browser found it. A test now signs in for real and reads with the
+  cookie the browser would send.
+- **"Not found" must be word for word, unrouted paths too.** The test
+  compared every routed read for a hidden thing with one that never existed;
+  production showed `/api/cars/{slug}` (no such route) answering a JSON `404`
+  for a hidden car and routing's empty one otherwise. The plugin now only
+  answers paths a route serves. A test of the crew's login had used a path no
+  route serves, and passed only because the plugin answered everything.
+- **Two `1012`s across one deploy** (`00043`), each reconnected at once;
+  `00042` gave one.
