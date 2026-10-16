@@ -214,6 +214,41 @@ class EventResultsTest {
     }
 
     @Test
+    fun `a race in two sessions is one race, with no lap across the break between them, each session's flags its own (M26)`() = testApplication {
+        app()
+        val r1 = "5ace0000-1111-4111-8111-0000000a0260"
+        val r2 = "5ace0000-1111-4111-8111-0000000b0260"
+        val r3 = "5ace0000-1111-4111-8111-0000000c0260"
+        runBlocking {
+            registry.addCar(Slug.parse("outback"), "Outback")
+            courses.save("box", 0, "The box", boxGeoJson(), Instant.EPOCH)
+            stores.drivers.put(Driver("d-sam", "Sam Voigt", "SAM"))
+            stores.drivers.put(Driver("d-alex", "Alex Rider", "ALE"))
+            stores.events.save(Event("race-weekend", "Race weekend", "2026-10-04", "box", "box", listOf("outback"), listOf(
+                Part("p1", PartKind.RACE, "Race, Saturday", at(0), at(28), green = t0.plusMillis(100_000).plusSeconds(600)),
+                Part("p2", PartKind.RACE, "Race, Sunday", at(28), at(60)),
+            ), endDate = "2026-10-05"), 0, t0)
+        }
+        // The same drive as the one-timeline race below: r1 and r2 Saturday's (one run of the app), r3 Sunday's, Alex's.
+        session(r1, 10, boxLog(0, 300, device = "tab-r"), "d-sam")
+        session(r2, 20, boxLog(310, 600, device = "tab-r"), null)
+        session(r3, 30, boxLog(700, 1000, device = "tab-r", atShift = -690_000), "d-alex")
+        val results = json.decodeFromString<EventResults>(client.get("/api/events/race-weekend").bodyAsText())
+        results.event.endDate shouldBe "2026-10-05"
+        val race = results.race!!
+        race.sessions.map { it.part.name } shouldBe listOf("Race, Saturday", "Race, Sunday")
+        race.sessions.map { it.green != null } shouldBe listOf(true, false)
+        val car = race.cars.single()
+        car.laps.size shouldBe 12 // the one-timeline race's 13, less the lap it bridged the restart with
+        car.laps.none { it.source == "restart" } shouldBe true
+        car.sessions.map { it.part } shouldBe listOf("p1", "p2")
+        car.sessions[1].firstLap shouldBe car.sessions[0].laps + 1
+        car.seconds shouldBe (car.sessions.sumOf { it.seconds } plusOrMinus 1e-3)
+        car.stints.map { it.driver } shouldBe listOf("d-sam", "d-alex")
+        car.greenLap shouldBe 2
+    }
+
+    @Test
     fun `the race is one timeline, through a dropped link and a restart, the flag placed from the tablet's offset`() = testApplication {
         app()
         val r1 = "5ace0000-1111-4111-8111-0000000a0154"
@@ -241,7 +276,7 @@ class EventResultsTest {
         car.stints.single().let { it.driver shouldBe "d-sam"; it.laps shouldBe 13 }
         car.greenLap shouldBe 2
         race.tabletOffset.keys shouldBe setOf("outback")
-        race.green shouldBe t0.plusMillis(100_000).plusSeconds(600).toEpochMilli()
+        race.sessions.single().green shouldBe t0.plusMillis(100_000).plusSeconds(600).toEpochMilli()
         json.decodeFromString<EventResults>(client.get("/api/events/race-day").bodyAsText()).event.revision shouldBe 1
 
         // Stints as edited replace the default.
@@ -254,7 +289,7 @@ class EventResultsTest {
         }
         val edited = json.decodeFromString<EventResults>(client.get("/api/events/race-day").bodyAsText()).race!!
         edited.cars.single().stints.map { it.firstLap to it.lastLap } shouldBe listOf(1 to 5, 6 to 13)
-        edited.edited.keys shouldBe setOf("outback")
+        edited.sessions.single().edited.keys shouldBe setOf("outback")
 
         // Sam's page (M15.5): their race stints.
         val samRecord = json.decodeFromString<DriverRecord>(client.get("/api/drivers/d-sam").bodyAsText())

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte'
-  import type { DriverRecord } from './lib/eventResults'
+  import { dateText, type DriverRecord } from './lib/eventResults'
   import { raceClock } from './lib/race'
   import { lapTime } from './lib/sessions'
   import { lapLink } from './lib/laps'
@@ -65,7 +65,7 @@
     {/if}
     {#each record.events as e (e.event.id)}
       <section class="panel">
-        <h2><a href={`/events/${e.event.id}`}>{e.event.name}</a> <span class="muted small">{e.event.date} · {e.event.courseName}</span></h2>
+        <h2><a href={`/events/${e.event.id}`}>{e.event.name}</a> <span class="muted small">{dateText(e.event)} · {e.event.courseName}</span></h2>
         {#each e.practice as p (p.part)}
           <p>{p.part}: best <strong>{lapTime(p.best.lap.time)}</strong></p>
         {/each}

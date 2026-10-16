@@ -21,7 +21,13 @@ import kotlinx.serialization.Serializable
 
 /** The race's green flag and chequered flag (M15.3), epoch milliseconds, real time; null clears one. */
 @Serializable
-data class SaveFlags(val expected: Int, val green: Long? = null, val flag: Long? = null)
+data class SaveFlags(
+    val expected: Int,
+    val green: Long? = null,
+    val flag: Long? = null,
+    /** Which race session (M26): its part's id; none for a race in one. */
+    val part: String? = null,
+)
 
 /** A stint as edited: from [start] on the tablet's clock, milliseconds. */
 @Serializable
@@ -29,7 +35,12 @@ data class StintView(val start: Long, val driver: String? = null)
 
 /** A car's stints (M15.3); null or empty goes back to the default, split at every stop. */
 @Serializable
-data class SaveStints(val expected: Int, val stints: List<StintView>? = null)
+data class SaveStints(
+    val expected: Int,
+    val stints: List<StintView>? = null,
+    /** Which race session (M26): its part's id; none for a race in one. */
+    val part: String? = null,
+)
 
 /** What an edit to the race answers: the event's new revision, for the next edit. */
 @Serializable
@@ -77,7 +88,7 @@ fun Route.raceRoutes(
 
 private suspend fun ApplicationCall.flags(stores: EventStores, clock: Clock, onChanged: () -> Unit, id: String, crewOf: String?, who: String) {
     val request = receive<SaveFlags>()
-    editRace(stores, clock, onChanged, id, crewOf, request.expected, who, "flags ${request.green?.let(Instant::ofEpochMilli)} to ${request.flag?.let(Instant::ofEpochMilli)}") {
+    editRace(stores, clock, onChanged, id, crewOf, request.expected, request.part, who, "flags ${request.green?.let(Instant::ofEpochMilli)} to ${request.flag?.let(Instant::ofEpochMilli)}") {
         it.copy(green = request.green?.let(Instant::ofEpochMilli), flag = request.flag?.let(Instant::ofEpochMilli))
     }
 }
@@ -88,7 +99,7 @@ private suspend fun ApplicationCall.stints(stores: EventStores, clock: Clock, on
     val unknown = stints.mapNotNull { it.driver }.distinct().filter { stores.drivers.get(it) == null }
     if (unknown.isNotEmpty()) return respond(HttpStatusCode.BadRequest, EventRefused("invalid", "No such driver.", unknown.map { "there's no driver $it" }))
     val what = if (stints.isEmpty()) "stints of $car back to the default" else "${stints.size} stint(s) of $car"
-    editRace(stores, clock, onChanged, id, car, request.expected, who, what) { race ->
+    editRace(stores, clock, onChanged, id, car, request.expected, request.part, who, what) { race ->
         race.copy(stints = if (stints.isEmpty()) race.stints - car else race.stints + (car to stints.sortedBy { it.start }))
     }
 }
@@ -101,19 +112,28 @@ private suspend fun ApplicationCall.editRace(
     id: String,
     crewOf: String?,
     expected: Int,
+    /** Which race session (M26); none means the race's only one. */
+    part: String?,
     who: String,
     what: String,
     change: (Part) -> Part,
 ) {
     val event = stores.events.get(id) ?: return respond(HttpStatusCode.NotFound, ApiError("not_found", "No such event."))
     if (crewOf != null && crewOf !in event.cars) return respond(HttpStatusCode.NotFound, ApiError("not_found", "This car isn't in that event."))
-    val race = event.race ?: return respond(HttpStatusCode.Conflict, ApiError("no_race", "This event has no race."))
+    val races = event.races
+    if (races.isEmpty()) return respond(HttpStatusCode.Conflict, ApiError("no_race", "This event has no race."))
+    val race = when {
+        part != null -> races.firstOrNull { it.id == part }
+            ?: return respond(HttpStatusCode.NotFound, ApiError("not_found", "This event's race has no session $part."))
+        races.size == 1 -> races.single()
+        else -> return respond(HttpStatusCode.BadRequest, ApiError("which_session", "This race is run in sessions: say which."))
+    }
     val changed: Event = event.copy(parts = event.parts.map { if (it.id == race.id && it.kind == PartKind.RACE) change(it) else it })
     val problems = EventRules.eventProblems(changed)
     if (problems.isNotEmpty()) return respond(HttpStatusCode.BadRequest, EventRefused("invalid", "The race can't be saved as it is.", problems))
     val saved = stores.events.save(changed, expected, clock.instant())
         ?: return respond(HttpStatusCode.Conflict, ApiError("conflict", "Someone changed this event since you opened it. Reload it, and make your change again."))
-    adminLog.info("race of {} set, {}, by {}", id, what, who)
+    adminLog.info("race of {} set, {}, by {}", if (races.size > 1) "$id (${race.id})" else id, what, who)
     onChanged()
     respond(RaceSaved(saved.revision))
 }

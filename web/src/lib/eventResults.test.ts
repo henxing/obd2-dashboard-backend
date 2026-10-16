@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { driverLabel, gap, sectorGap, windowText, partOn, whereText } from './eventResults'
+import { dateText, driverLabel, gap, sectorGap, windowText, partOn, whereText } from './eventResults'
 
 describe('an event’s results (M14.5)', () => {
   it('the gap to the fastest, to the millisecond', () => {
@@ -38,5 +38,13 @@ describe('where an event is (M25)', () => {
   it('names the course and layout, and nothing for a course hidden from you', () => {
     expect(whereText({ course: 'nhms', courseName: 'NHMS', layoutName: 'Road Course' })).toBe('NHMS, Road Course')
     expect(whereText({ course: '', courseName: '', layoutName: '' })).toBe('')
+  })
+})
+
+describe('an event’s days (M26)', () => {
+  it('one date for one day, a range for several', () => {
+    expect(dateText({ date: '2026-10-04' })).toBe('2026-10-04')
+    expect(dateText({ date: '2026-10-04', endDate: '2026-10-04' })).toBe('2026-10-04')
+    expect(dateText({ date: '2026-10-02', endDate: '2026-10-04' })).toBe('2026-10-02 – 2026-10-04')
   })
 })

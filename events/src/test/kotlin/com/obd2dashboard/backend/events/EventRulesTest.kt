@@ -35,7 +35,6 @@ class EventRulesTest {
         problems shouldContain "a date is written 2026-10-04"
         problems shouldContain "an event is at a course, on one of its layouts"
         problems shouldContain "a car is entered once"
-        problems shouldContain "an event has at most one race"
         problems shouldContain "Part p1 and Part p2 overlap"
         problems shouldContain "Part p3: it ends after it starts"
         problems shouldContain "Part p4: a part is at most 30 hours"
@@ -105,6 +104,20 @@ class EventRulesTest {
         kept.parts[1].end shouldBe at(500) // what was drawn stays drawn
         kept.parts[2] shouldBe drawn.parts[2]
         drawn.keepingRaceEdits(null) shouldBe drawn
+    }
+
+    @Test
+    fun `a race in sessions - several race parts, in time order, and an event over several days (M26)`() {
+        val sessions = event(part("p1", 0, 60), part("p3", 3000, 3600, PartKind.RACE), part("p2", 600, 1200, PartKind.RACE))
+        EventRules.eventProblems(sessions) shouldBe emptyList()
+        sessions.races.map { it.id } shouldBe listOf("p2", "p3")
+        sessions.race!!.id shouldBe "p2"
+        // Each session's flags and stints are its own.
+        EventRules.eventProblems(event(part("p2", 0, 60, PartKind.RACE), part("p3", 100, 160, PartKind.RACE).copy(green = at(110), flag = at(150)))) shouldBe emptyList()
+        EventRules.eventProblems(event().copy(endDate = "2026-10-06")) shouldBe emptyList()
+        EventRules.eventProblems(event().copy(endDate = "2026-10-04")) shouldBe emptyList() // one day, said twice
+        EventRules.eventProblems(event().copy(endDate = "2026-10-03")) shouldBe listOf("the end date is on or after the date")
+        EventRules.eventProblems(event().copy(endDate = "6 Oct")) shouldBe listOf("an end date is written 2026-10-06")
     }
 
     @Test

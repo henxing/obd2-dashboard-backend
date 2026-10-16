@@ -18,6 +18,7 @@
   let newId = $state('')
   let idTouched = $state(false)
   let date = $state(toLocalInput(Date.now()).slice(0, 10)) // today where you are, not in UTC
+  let endDate = $state('') // its last day, for an event over several (M26); blank for one
   let course = $state('')
   let layout = $state('')
   let cars: string[] = $state([])
@@ -35,7 +36,7 @@
   let problems: string[] = $state([])
 
   const eventId = $derived(isNew ? newId : pathId)
-  const draft = $derived({ name, date, course, layout, cars, parts })
+  const draft = $derived({ name, date, endDate, course, layout, cars, parts })
   const changed = $derived(JSON.stringify(draft) !== saved)
   const layouts = $derived(allCourses.find((c) => c.id === course)?.layouts ?? [])
   const driverName = (id: string | null | undefined) => drivers.find((d) => d.id === id)?.code ?? '—'
@@ -84,12 +85,13 @@
     page = p
     name = p.event.name
     date = p.event.date
+    endDate = p.event.endDate ?? ''
     course = p.event.course
     layout = p.event.layout
     cars = p.event.cars
     parts = p.event.parts
     revision = p.event.revision
-    saved = JSON.stringify({ name, date, course, layout, cars, parts })
+    saved = JSON.stringify({ name, date, endDate, course, layout, cars, parts })
   }
 
   async function save() {
@@ -157,6 +159,7 @@
         <label><span>Id (in its address, for good)</span><input bind:value={newId} oninput={() => (idTouched = true)} /></label>
       {/if}
       <label><span>Date</span><input type="date" bind:value={date} /></label>
+      <label><span>Last day, if it's over several</span><input type="date" bind:value={endDate} min={date} /></label>
       <label><span>Course</span>
         <select bind:value={course}>
           {#each allCourses as c (c.id)}<option value={c.id}>{c.name}</option>{/each}
@@ -177,7 +180,7 @@
 
     <section class="panel">
       <h2>Parts</h2>
-      <p class="muted small">Times are yours ({Intl.DateTimeFormat().resolvedOptions().timeZone}). A session joins the part the server heard it during.</p>
+      <p class="muted small">Times are yours ({Intl.DateTimeFormat().resolvedOptions().timeZone}). A session joins the part the server heard it during. Several race parts are one race in sessions (Saturday’s and Sunday’s, say): laps add up across them, and the break between is never a lap.</p>
       {#each parts as p, i (p.id ?? `new-${i}`)}
         <div class="part">
           <input class="partname" value={p.name} oninput={(e) => setPart(i, { name: e.currentTarget.value })} aria-label="Part's name" />
@@ -190,7 +193,8 @@
       {/each}
       <p class="row">
         <button onclick={() => addPart('practice')}>Add a practice</button>
-        {#if !parts.some((p) => p.kind === 'race')}<button onclick={() => addPart('race')}>Add the race</button>{/if}
+        <!-- Another race part is another session of the one race (M26): Sunday's, after Saturday's. -->
+        <button onclick={() => addPart('race')}>{parts.some((p) => p.kind === 'race') ? 'Add a race session' : 'Add the race'}</button>
       </p>
     </section>
 

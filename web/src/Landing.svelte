@@ -4,7 +4,7 @@
   import { fetchCars, type CarSummary } from './lib/api'
   import type { CourseSummary, CourseView } from './lib/admin'
   import { fromGeoJSON, type EditCourse } from './lib/courseEdit'
-  import { whereText, type PublicEvent } from './lib/eventResults'
+  import { dateText, whereText, type PublicEvent } from './lib/eventResults'
   import HiddenBadge from './HiddenBadge.svelte'
   import type { Driver } from './lib/events'
   import { eventsShown, latestSession, layoutsLine, sessionLine, underWay } from './lib/landing'
@@ -132,7 +132,7 @@
           <li>
             <a href={`/events/${e.id}`}><strong>{e.name}</strong></a>{#if e.hidden}<HiddenBadge />{/if}
             {#if underWay(e, now)}<span class="under-way"><span class="dot live"></span>Under way</span>{/if}
-            <span class="muted small">{[e.date, whereText(e), e.cars.map((c) => c.name).join(', ')].filter(Boolean).join(' · ')}</span>
+            <span class="muted small">{[dateText(e), whereText(e), e.cars.map((c) => c.name).join(', ')].filter(Boolean).join(' · ')}</span>
           </li>
         {/each}
       </ul>

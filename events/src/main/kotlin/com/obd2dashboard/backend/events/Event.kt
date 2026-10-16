@@ -51,8 +51,14 @@ public data class Event(
     val parts: List<Part>,
     val revision: Int = 0,
     val updated: Instant = Instant.EPOCH,
+    /** Its last day (M26), `2026-10-06`, for an event over several; null for one day. */
+    val endDate: String? = null,
 ) {
-    public val race: Part? get() = parts.firstOrNull { it.kind == PartKind.RACE }
+    /** The race's first session: the race, unless it's run in sessions. */
+    public val race: Part? get() = races.firstOrNull()
+
+    /** The race (M26): its race parts in time order, one session each (Saturday's and Sunday's, say); empty if none. */
+    public val races: List<Part> get() = parts.filter { it.kind == PartKind.RACE }.sortedBy { it.start }
 
     /** [parts] as drawn, with what only the race routes set kept from the stored parts of the same ids (M15.3). */
     public fun keepingRaceEdits(stored: Event?): Event = copy(parts = parts.map { p ->

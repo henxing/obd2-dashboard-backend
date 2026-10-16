@@ -35,6 +35,8 @@ export interface EventView {
   cars: string[]
   parts: Part[]
   revision: number
+  /** Its last day (M26), for an event over several. */
+  endDate?: string | null
 }
 
 /** A session as an event's page lists it. */
@@ -62,7 +64,7 @@ export interface AdminEvent {
 
 /** What `PUT /events/{id}` takes: the revision it replaces (0 for new). */
 export function saveBody(e: Omit<EventView, 'id' | 'revision'>, expected: number) {
-  return { expected, name: e.name, date: e.date, course: e.course, layout: e.layout, cars: e.cars, parts: e.parts }
+  return { expected, name: e.name, date: e.date, endDate: e.endDate || null, course: e.course, layout: e.layout, cars: e.cars, parts: e.parts }
 }
 
 /** A `datetime-local` input's value for [ms], in the viewer's time zone: `2026-10-04T09:00`. */
@@ -80,18 +82,29 @@ export function fromLocalInput(value: string): number | null {
   return Number.isNaN(ms) ? null : ms
 }
 
-/** A new part after the last (an hour, starting where the last ended, or at 9:00 on [date]). */
+/**
+ * A new part after the last (an hour, starting where the last ended, or at 9:00 on [date]). Another session of the
+ * race (M26) is the next day's, from 9:00: the car was off track overnight.
+ */
 export function newPart(parts: readonly Part[], kind: PartKind, date: string): Part {
-  const after = parts.length > 0 ? Math.max(...parts.map((p) => p.end)) : fromLocalInput(`${date}T09:00`) ?? Date.now()
+  const races = parts.filter((p) => p.kind === 'race').length
+  const last = parts.length > 0 ? Math.max(...parts.map((p) => p.end)) : null
+  const after = last === null ? (fromLocalInput(`${date}T09:00`) ?? Date.now()) : kind === 'race' && races > 0 ? nextMorning(last) : last
   const practices = parts.filter((p) => p.kind === 'practice').length
   return {
     kind,
-    name: kind === 'race' ? 'Race' : `Practice ${practices + 1}`,
+    name: kind === 'race' ? (races > 0 ? `Race, session ${races + 1}` : 'Race') : `Practice ${practices + 1}`,
     start: after,
     end: after + (kind === 'race' ? 6 : 1) * 3_600_000,
     added: [],
     removed: [],
   }
+}
+
+/** 9:00 the day after [ms], where you are. */
+function nextMorning(ms: number): number {
+  const d = new Date(ms)
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 9).getTime()
 }
 
 /** [session] into part [partId] by hand: added there (and nowhere else), no longer removed from it. */

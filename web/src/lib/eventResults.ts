@@ -30,6 +30,13 @@ export interface PublicEvent {
   revision: number
   /** Said only to someone signed in (M25). */
   hidden?: boolean
+  /** Its last day (M26), for an event over several. */
+  endDate?: string | null
+}
+
+/** "2026-10-02 – 2026-10-04": an event's days (M26); one date for one day. */
+export function dateText(e: Pick<PublicEvent, 'date' | 'endDate'>): string {
+  return e.endDate && e.endDate !== e.date ? `${e.date} – ${e.endDate}` : e.date
 }
 
 /** "NHMS, Road Course": where it is; nothing for a course hidden from you (M25), which isn't named. */

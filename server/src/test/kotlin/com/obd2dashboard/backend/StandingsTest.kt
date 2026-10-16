@@ -3,6 +3,7 @@ package com.obd2dashboard.backend
 import com.obd2dashboard.backend.events.Driver
 import com.obd2dashboard.backend.timing.LapSource
 import com.obd2dashboard.backend.timing.PitCrossing
+import com.obd2dashboard.backend.timing.RaceSessionInput
 import com.obd2dashboard.backend.timing.RunLap
 import com.obd2dashboard.backend.timing.RunTiming
 import com.obd2dashboard.backend.timing.StintMark
@@ -61,7 +62,7 @@ class StandingsTest {
 
     @Test
     fun `in a race, the lap count, when the car left the pits, and the stint's driver`() {
-        val race = RaceNowInput(setOf("c1", "t1", "c2"), null, null, null)
+        val race = RaceNowInput(listOf(RaceSessionInput("p2", setOf("c1", "t1", "c2"))))
         val before = run(lap("c1", 0, n = 1), lap("c1", 70_000, n = 2))
         Standings.of("outback", "c1", box, listOf(before), setOf("c1"), mapOf("c1" to sam), race).let {
             it.race shouldBe RaceNow(2, W) // no stop yet: since the race's first lap
@@ -86,7 +87,7 @@ class StandingsTest {
     fun `in a race with stints as they fall, the session's driver as set is who's driving now`() {
         // No stop yet, so one stint, Sam's; the crew says Alex took over in c2 (from the car page).
         val runs = listOf(run(lap("c1", 0, n = 1), lap("c2", 70_000, n = 2)))
-        val race = RaceNowInput(setOf("c1", "c2"), null, null, null)
+        val race = RaceNowInput(listOf(RaceSessionInput("p2", setOf("c1", "c2"))))
         Standings.of("outback", "c2", box, runs, setOf("c1", "c2"), mapOf("c1" to sam, "c2" to alex), race).driver shouldBe DriverNow("Alex Rider", "ALE", W)
         Standings.of("outback", "c2", box, runs, setOf("c1", "c2"), mapOf("c1" to sam), race).driver shouldBe DriverNow("Sam Voigt", "SAM", W)
     }
@@ -95,10 +96,30 @@ class StandingsTest {
     fun `stints as edited name the driver, of the car now and of the best lap`() {
         // The crew says Alex drove from lap 2, with no stop, in Sam's session.
         val runs = listOf(run(lap("c1", 0, n = 1), lap("c1", 70_000, 65_000, n = 2)))
-        val race = RaceNowInput(setOf("c1"), listOf(StintMark(W, "d-sam"), StintMark(W + 70_000, "d-alex")), null, null)
+        val race = RaceNowInput(listOf(RaceSessionInput("p2", setOf("c1"), edited = listOf(StintMark(W, "d-sam"), StintMark(W + 70_000, "d-alex")))))
         Standings.of("outback", "c1", box, runs, setOf("c1"), mapOf("c1" to sam), race, roster = mapOf("d-sam" to sam, "d-alex" to alex)).let {
             it.driver shouldBe DriverNow("Alex Rider", "ALE", W + 70_000)
             it.best!!.driver shouldBe "ALE"
+        }
+    }
+
+    @Test
+    fun `on Sunday, the race's lap count goes on from Saturday's, and the car left the pits at Sunday's first lap (M26)`() {
+        // Saturday: two laps and a stop (in and out). Sunday, the app afresh 16 hours on: Alex's first lap so far.
+        val night = 16 * 3_600_000L
+        val saturday = run(lap("sat", 0, n = 1), lap("sat", 70_000, n = 2, pitIn = true), lap("sat", 140_000, n = 3, pitOut = true),
+            crossings = listOf(PitCrossing("sat", "in", 130_000.0), PitCrossing("sat", "out", 160_000.0)))
+        val sunday = RunTiming(2, "box", 3, "box", listOf("sun"), listOf(lap("sun", 0, n = 1)), emptyList(), mapOf("sun" to W + 210_000 + night), emptyList())
+        val race = RaceNowInput(listOf(RaceSessionInput("p2", setOf("sat")), RaceSessionInput("p3", setOf("sun"))))
+        Standings.of("outback", "sun", box, listOf(saturday, sunday), setOf("sat", "sun"), mapOf("sat" to sam, "sun" to alex), race).let {
+            it.race shouldBe RaceNow(4, W + 210_000 + night)
+            it.driver shouldBe DriverNow("Alex Rider", "ALE", W + 210_000 + night)
+        }
+        // Before Sunday's first crossing: nothing of the race yet, as at its very start; not Saturday's stint going on.
+        val sundayYet = RunTiming(2, "box", 3, "box", listOf("sun"), emptyList(), emptyList(), mapOf("sun" to W + 210_000 + night), emptyList())
+        Standings.of("outback", "sun", box, listOf(saturday, sundayYet), setOf("sat", "sun"), mapOf("sat" to sam, "sun" to alex), race).let {
+            it.race shouldBe null
+            it.driver!!.name shouldBe "Alex Rider"
         }
     }
 }

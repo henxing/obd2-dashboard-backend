@@ -52,14 +52,59 @@ export interface CarRace {
   stintsEdited?: boolean
   bestSectors?: (number | null)[]
   theoretical?: number | null
+  /** Each session of the race (M26): where it began in the laps, its laps and time, and its flags' laps. */
+  sessions?: RaceSessionSpan[]
+}
+
+/** One session of a car's race (M26): none of its laps (`firstLap` null) if the car didn't run in it. */
+export interface RaceSessionSpan {
+  part: string
+  firstLap?: number | null
+  laps: number
+  seconds: number
+  greenLap?: number | null
+  flagLap?: number | null
+}
+
+/** A session of the race (M26), a race part: its flags as entered, and each car's stints as edited in it. */
+export interface RaceSessionResults {
+  part: PublicPart
+  green?: number | null
+  flag?: number | null
+  edited?: Record<string, StintMark[]>
 }
 
 export interface RaceResults {
-  part: PublicPart
+  /** One for a race run in one; Saturday's and Sunday's, say, for one in sessions (M26). */
+  sessions: RaceSessionResults[]
   cars: CarRace[]
-  green?: number | null
-  flag?: number | null
   tabletOffset: Record<string, number>
+}
+
+/** The laps of [car]'s race in session [part] (M26); all of them for a race in one. */
+export function lapsIn(car: CarRace, part: string): RaceLap[] {
+  const span = car.sessions?.find((s) => s.part === part)
+  if (!span || car.sessions!.length < 2) return car.laps
+  if (span.firstLap == null) return []
+  return car.laps.filter((l) => l.number >= span.firstLap! && l.number < span.firstLap! + span.laps)
+}
+
+/** The stints of [car]'s race in session [part] (M26): a stint never crosses one. */
+export function stintsIn(car: CarRace, part: string): RaceStint[] {
+  const laps = new Set(lapsIn(car, part).map((l) => l.number))
+  return car.stints.filter((s) => s.firstLap != null && laps.has(s.firstLap))
+}
+
+/** The session a lap is the first of, for marking where each began (M26); null for any other lap, or a race in one. */
+export function sessionStartingAt(car: CarRace, lap: number): string | null {
+  if (!car.sessions || car.sessions.length < 2) return null
+  return car.sessions.find((s) => s.firstLap === lap)?.part ?? null
+}
+
+/** Whether lap [lap] is where a session's green flag, or its flag, fell (M26: any session's). */
+export function flagsAt(car: CarRace, lap: number): { green: boolean; flag: boolean } {
+  const spans = car.sessions?.length ? car.sessions : [{ greenLap: car.greenLap, flagLap: car.flagLap }]
+  return { green: spans.some((s) => s.greenLap === lap), flag: spans.some((s) => s.flagLap === lap) }
 }
 
 /** A stint as the editor holds it: from [start] on the tablet's clock. */

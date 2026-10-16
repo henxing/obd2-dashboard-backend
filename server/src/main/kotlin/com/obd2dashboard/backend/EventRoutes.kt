@@ -80,6 +80,9 @@ data class EventView(
     /** Signed in only (M23); public lists never carry it. */
     @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
     val access: AccessView? = null,
+    /** Its last day (M26), for an event over several. */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val endDate: String? = null,
 )
 
 /** A save: the revision it replaces (0 for a new event), so two editors can't both win. */
@@ -92,6 +95,8 @@ data class SaveEvent(
     val layout: String,
     val cars: List<String>,
     val parts: List<PartView>,
+    /** Its last day (M26); none, blank or the date itself for one day. */
+    val endDate: String? = null,
 )
 
 /** A session as an event's page lists it (M14). */
@@ -124,6 +129,7 @@ fun Event.view(): EventView = EventView(
     id, name, date, course, layout, cars,
     parts.map { PartView(it.id, it.kind.name.lowercase(), it.name, it.start.toEpochMilli(), it.end.toEpochMilli(), it.added, it.removed) },
     revision,
+    endDate = endDate,
 )
 
 /** What joining a part needs of a stored session: the server's times, and its source (the header's, else the summary's). */
@@ -205,7 +211,9 @@ fun Route.adminEventRoutes(
         val byId = sessions.associateBy { it.id }
         val placed = inParts.values.flatten().toSet()
         val day = runCatching { LocalDate.parse(event.date) }.getOrNull()
-        val around = day?.let { it.minusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC) to it.plusDays(2).atStartOfDay().toInstant(ZoneOffset.UTC) }
+        val lastDay = event.endDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: day
+        // Its days (M26: every one of them), and a day either side.
+        val around = day?.let { it.minusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC) to lastDay!!.plusDays(2).atStartOfDay().toInstant(ZoneOffset.UTC) }
         val others = sessions
             .filter { it.id !in placed && it.heard().source != "fake" }
             .filter { s -> around == null || (s.created.isBefore(around.second) && !s.updated.isBefore(around.first)) }
@@ -268,7 +276,8 @@ private suspend fun ApplicationCall.saveDriver(
 
 /** The event as it will be stored: new parts given the next ids, in turn. */
 private fun SaveEvent.toEvent(id: String, current: Event?): Event {
-    var draft = Event(id, name.trim(), date.trim(), course, layout, cars, current?.parts.orEmpty())
+    val end = endDate?.trim()?.takeIf { it.isNotEmpty() && it != date.trim() }
+    var draft = Event(id, name.trim(), date.trim(), course, layout, cars, current?.parts.orEmpty(), endDate = end)
     val parts = parts.map { p ->
         val kind = if (p.kind == "race") PartKind.RACE else PartKind.PRACTICE
         val partId = p.id ?: draft.nextPartId()

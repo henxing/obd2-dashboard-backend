@@ -38,11 +38,14 @@ public object EventRules {
     public fun eventProblems(event: Event): List<String> = buildList {
         idProblem(event.id)?.let(::add)
         nameProblem(event.name)?.let(::add)
-        try { LocalDate.parse(event.date) } catch (_: DateTimeParseException) { add("a date is written 2026-10-04") }
+        val first = try { LocalDate.parse(event.date) } catch (_: DateTimeParseException) { add("a date is written 2026-10-04"); null }
+        event.endDate?.let { end ->
+            val last = try { LocalDate.parse(end) } catch (_: DateTimeParseException) { add("an end date is written 2026-10-06"); null }
+            if (first != null && last != null && last.isBefore(first)) add("the end date is on or after the date")
+        }
         if (event.course.isBlank() || event.layout.isBlank()) add("an event is at a course, on one of its layouts")
         if (event.cars.isEmpty()) add("an event has at least one car")
         if (event.cars.toSet().size != event.cars.size) add("a car is entered once")
-        if (event.parts.count { it.kind == PartKind.RACE } > 1) add("an event has at most one race")
         if (event.parts.map { it.id }.toSet().size != event.parts.size) add("each part has its own id")
         for (part in event.parts) {
             nameProblem(part.name)?.let { add("${part.name.ifBlank { part.id }}: $it") }

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte'
   import {
-    driverLabel, gap, partOn, REFRESH_MS, sectorGap, windowText, type DriverBest, type DriverConsistency, type EventResults, type SectorRow, type SessionResult,
+    dateText, driverLabel, gap, partOn, REFRESH_MS, sectorGap, windowText, type DriverBest, type DriverConsistency, type EventResults, type SectorRow, type SessionResult,
   } from './lib/eventResults'
   import { lapTime } from './lib/sessions'
   import RaceSection from './RaceSection.svelte'
@@ -64,7 +64,7 @@
     <h1>{e.name}{#if e.hidden}<HiddenBadge />{/if}</h1>
     {#if may.edit}<p><a class="button" href={`/events/${id}/edit`}>Edit</a></p>{/if}
     <p class="muted">
-      {e.date}{#if e.course} · <a href={`/courses/${e.course}`}>{e.courseName}</a>, {e.layoutName}{/if}{#if e.cars.length} · {e.cars.map((c) => c.name).join(', ')}{/if}
+      {dateText(e)}{#if e.course} · <a href={`/courses/${e.course}`}>{e.courseName}</a>, {e.layoutName}{/if}{#if e.cars.length} · {e.cars.map((c) => c.name).join(', ')}{/if}
     </p>
 
     {#if results.parts.some((p) => p.part.kind === 'practice')}

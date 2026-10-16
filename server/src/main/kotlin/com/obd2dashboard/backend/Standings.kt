@@ -3,6 +3,7 @@ package com.obd2dashboard.backend
 import com.obd2dashboard.backend.events.Driver
 import com.obd2dashboard.backend.timing.CarRace
 import com.obd2dashboard.backend.timing.Race
+import com.obd2dashboard.backend.timing.RaceSessionInput
 import com.obd2dashboard.backend.timing.RunLap
 import com.obd2dashboard.backend.timing.RunTiming
 import com.obd2dashboard.backend.timing.StintMark
@@ -34,8 +35,12 @@ data class Standing(
     val race: RaceNow? = null,
 )
 
-/** The race part's say, when the car's session is in it. Flags already on the tablet's clock. */
-data class RaceNowInput(val sessions: Set<String>, val edited: List<StintMark>?, val green: Long?, val flag: Long?)
+/**
+ * The race's say, when the car's session is in it: its sessions so far (M26:
+ * Saturday's and Sunday's, the car's in the last), flags already on the
+ * tablet's clock.
+ */
+data class RaceNowInput(val sessions: List<RaceSessionInput>)
 
 /** Pure: the car's runs in, where it stands out (M17.3). */
 object Standings {
@@ -56,9 +61,11 @@ object Standings {
         roster: Map<String, Driver> = drivers.values.filterNotNull().associateBy { it.id },
     ): Standing {
         val onLayout = runs.filter { course == null || it.layout == course.layout }
+        // Until the session the car is in has a lap, nothing of the race, as at its very start (M26: Sunday's, before
+        // its first crossing, isn't Saturday's stint going on).
         val carRace = race?.let { r ->
-            Race.car(car, onLayout, r.sessions, drivers.mapValues { it.value?.id }, r.edited?.takeIf { it.isNotEmpty() }, r.green, r.flag)
-        }
+            Race.sessions(car, onLayout, r.sessions.map { it.copy(edited = it.edited?.takeIf { e -> e.isNotEmpty() }) }, drivers.mapValues { it.value?.id })
+        }?.takeIf { it.sessions.lastOrNull()?.firstLap != null }
         val byId = roster
         // In the race, a lap's driver is its stint's; elsewhere its session's.
         fun driverOf(run: RunTiming, lap: RunLap): Driver? {
@@ -74,7 +81,7 @@ object Standings {
         }
         return Standing(
             session, course, best, sectors,
-            driver = driverNow(carRace, race?.edited?.isNotEmpty() == true, onLayout, session, drivers, byId),
+            driver = driverNow(carRace, race?.sessions?.lastOrNull()?.edited?.isNotEmpty() == true, onLayout, session, drivers, byId),
             race = carRace?.let { RaceNow(it.laps.size, leftPits(it)) },
         )
     }
@@ -100,9 +107,13 @@ object Standings {
         return DriverNow(driver?.name, driver?.code, exit ?: first)
     }
 
-    /** When the car last left the pits: the last stop's exit; before any stop, the race's first lap; null while in the pits. */
+    /**
+     * When the car last left the pits: the last stop's exit; before any stop, the first lap of the session it's in (M26:
+     * Sunday's, not a stop on Saturday); null while in the pits.
+     */
     private fun leftPits(race: CarRace): Long? {
-        val last = race.stops.lastOrNull() ?: return race.laps.firstOrNull()?.start
+        val firstLap = race.sessions.lastOrNull { it.firstLap != null }?.firstLap ?: 1
+        val last = race.stops.lastOrNull { it.lap >= firstLap } ?: return race.laps.getOrNull(firstLap - 1)?.start
         return last.exit
     }
 

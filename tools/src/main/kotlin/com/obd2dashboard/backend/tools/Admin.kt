@@ -488,7 +488,7 @@ class ListEvents : CliktCommand(name = "events") {
         val events = tools.events.list()
         if (events.isEmpty()) return@runBlocking echo("No events.")
         for (e in events) {
-            echo("${e.id}  ${e.name}, ${e.date}, ${e.course} (${e.layout}), cars ${e.cars.joinToString(", ")}")
+            echo("${e.id}  ${e.name}, ${e.date}${e.endDate?.let { " to $it" }.orEmpty()}, ${e.course} (${e.layout}), cars ${e.cars.joinToString(", ")}")
             for (p in e.parts) echo("  ${p.id}  ${p.kind.name.lowercase().padEnd(8)}  ${p.name}: ${p.start} to ${p.end}")
         }
     }
@@ -532,9 +532,11 @@ class RemoveDriver(private val io: AdminIo) : CliktCommand(name = "remove-driver
 
 /**
  * An event from a JSON file (M14.6), as its next revision: `id`, `name`,
- * `date`, `course`, `layout`, `cars`, and `parts`, each a `kind` (`practice` or
- * `race`), `name`, and `start` and `end` as ISO times with their offset
- * (`2026-10-04T09:00:00-04:00`). Every rule the admin page applies.
+ * `date` (and `endDate`, its last day, for one over several: M26), `course`,
+ * `layout`, `cars`, and `parts`, each a `kind` (`practice` or `race`; several
+ * race parts are one race in sessions), `name`, and `start` and `end` as ISO
+ * times with their offset (`2026-10-04T09:00:00-04:00`). Every rule the admin
+ * page applies.
  */
 class ImportEvent : CliktCommand(name = "import-event") {
     private val tools: Tools by requireObject<Tools>()
@@ -549,7 +551,8 @@ class ImportEvent : CliktCommand(name = "import-event") {
         val id = str(json, "id")
         val current = if (EventRules.idProblem(id) == null) tools.events.get(id) else null
         var draft = Event(id, str(json, "name").trim(), str(json, "date"), str(json, "course"), str(json, "layout"),
-            (json["cars"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.contentOrNull }, current?.parts.orEmpty())
+            (json["cars"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.contentOrNull }, current?.parts.orEmpty(),
+            endDate = str(json, "endDate").trim().takeIf { it.isNotEmpty() && it != str(json, "date") })
         val problems = mutableListOf<String>()
         val parts = (json["parts"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.map { p ->
             fun time(key: String) = runCatching { Instant.from(DateTimeFormatter.ISO_OFFSET_DATE_TIME.parse(str(p, key))) }

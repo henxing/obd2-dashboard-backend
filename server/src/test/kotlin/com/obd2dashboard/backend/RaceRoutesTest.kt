@@ -192,4 +192,34 @@ class RaceRoutesTest {
         race().green shouldBe Instant.ofEpochMilli(green)
         log.list.map { it.formattedMessage }.any { it.startsWith("race of race-day set") && it.endsWith("by ed@example.com") } shouldBe true
     }
+
+    @Test
+    fun `a race in sessions - each session's flags and stints are its own, and an edit says which (M26)`() = testApplication {
+        app()
+        runBlocking {
+            stores.events.save(Event("weekend", "Weekend", "2026-10-03", "nhms", "road", listOf("outback", "yaris"), listOf(
+                Part("p1", PartKind.PRACTICE, "Practice", t0, t0.plusSeconds(3600)),
+                Part("p2", PartKind.RACE, "Race, Saturday", t0.plusSeconds(3600), t0.plusSeconds(8 * 3600)),
+                Part("p3", PartKind.RACE, "Race, Sunday", t0.plusSeconds(86_400), t0.plusSeconds(86_400 + 6 * 3600)),
+            ), endDate = "2026-10-04"), 0, t0)
+        }
+        val a = admin()
+        val sundayGreen = t0.plusSeconds(86_500).toEpochMilli()
+        put("/api/admin/events/weekend/race", a, """{"expected":1,"green":$sundayGreen}""").let {
+            it.status shouldBe HttpStatusCode.BadRequest
+            it.bodyAsText() shouldContain "say which"
+        }
+        put("/api/admin/events/weekend/race", a, """{"expected":1,"green":$sundayGreen,"part":"p9"}""").status shouldBe HttpStatusCode.NotFound
+        put("/api/admin/events/weekend/race", a, """{"expected":1,"green":$sundayGreen,"part":"p1"}""").status shouldBe HttpStatusCode.NotFound // practice
+        put("/api/admin/events/weekend/race", a, """{"expected":1,"green":$sundayGreen,"part":"p3"}""").status shouldBe HttpStatusCode.OK
+        val crew = crew("yaris", "pit-lane")
+        put("/api/cars/yaris/events/weekend/race/stints", crew, """{"expected":2,"stints":[{"start":5,"driver":"d-sam"}],"part":"p2"}""").status shouldBe HttpStatusCode.OK
+        runBlocking { stores.events.get("weekend")!! }.races.let { (sat, sun) ->
+            sat.green shouldBe null
+            sat.stints.keys shouldBe setOf("yaris")
+            sun.green shouldBe Instant.ofEpochMilli(sundayGreen)
+            sun.stints shouldBe emptyMap()
+        }
+        log.list.map { it.formattedMessage } shouldContain "race of weekend (p3) set, flags ${Instant.ofEpochMilli(sundayGreen)} to null, by sam@example.com"
+    }
 }

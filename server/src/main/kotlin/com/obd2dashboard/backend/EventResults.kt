@@ -14,6 +14,7 @@ import com.obd2dashboard.backend.timing.CarRace
 import com.obd2dashboard.backend.timing.Consistency
 import com.obd2dashboard.backend.timing.Provisional
 import com.obd2dashboard.backend.timing.Race
+import com.obd2dashboard.backend.timing.RaceSessionInput
 import com.obd2dashboard.backend.timing.StintMark
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.response.respond
@@ -47,6 +48,9 @@ data class PublicEvent(
     /** Hidden (M25), said only to someone signed in. */
     @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
     val hidden: Boolean = false,
+    /** Its last day (M26), for an event over several. */
+    @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val endDate: String? = null,
 )
 
 /** A session in an event's results: its laps as they stand on the event's course. */
@@ -99,22 +103,29 @@ data class PartResults(
     val consistency: List<DriverConsistency> = emptyList(),
 )
 
-/**
- * The race as one timeline (M15.4): each car's, classified. Laps, stops and
- * stints are on each tablet's clock; [tabletOffset] (by car) turns one into
- * the time of day.
- */
+/** A session of the race (M26), a race part: its flags as entered, and each car's stints as edited in it. */
 @Serializable
-data class RaceResults(
+data class RaceSessionResults(
     val part: PublicPart,
-    val cars: List<CarRace>,
     /** As entered, epoch milliseconds, real time. */
     val green: Long? = null,
     val flag: Long? = null,
-    /** How far each car's tablet clock is behind the server's, milliseconds. */
-    val tabletOffset: Map<String, Long> = emptyMap(),
     /** Each car's stints as edited; absent for the default. */
     val edited: Map<String, List<StintView>> = emptyMap(),
+)
+
+/**
+ * The race as one timeline (M15.4), over its sessions (M26): each car's,
+ * classified. Laps, stops and stints are on each tablet's clock;
+ * [tabletOffset] (by car) turns one into the time of day.
+ */
+@Serializable
+data class RaceResults(
+    /** One for a race run in one; Saturday's and Sunday's, say, for one in sessions. */
+    val sessions: List<RaceSessionResults>,
+    val cars: List<CarRace>,
+    /** How far each car's tablet clock is behind the server's, milliseconds. */
+    val tabletOffset: Map<String, Long> = emptyMap(),
 )
 
 @Serializable
@@ -222,6 +233,7 @@ fun Route.publicEventRoutes(
             event.cars.map { slug -> CarRef(slug, runCatching { registry.get(Slug.parse(slug))?.name }.getOrNull() ?: slug) },
             event.parts.map { PublicPart(it.id, it.kind.name.lowercase(), it.name, it.start.toEpochMilli(), it.end.toEpochMilli()) },
             event.revision,
+            endDate = event.endDate,
         )
     }
 
@@ -274,8 +286,8 @@ fun Route.publicEventRoutes(
             )
         }
         val practice = parts.filter { it.part.kind == PartKind.PRACTICE.name.lowercase() }.flatMap { it.sessions }
-        val race = event.race?.let { racePart ->
-            val raceIds = inParts[racePart.id].orEmpty()
+        val race = event.races.takeIf { it.isNotEmpty() }?.let { raceParts ->
+            val raceIds = raceParts.flatMap { inParts[it.id].orEmpty() }
             val raceRecords = raceIds.mapNotNull { records[it] }
             val byCar = raceRecords.groupBy { it.car }
             val cars = byCar.mapNotNull { (car, sessions) ->
@@ -290,20 +302,28 @@ fun Route.publicEventRoutes(
                 val offset = sessions.mapNotNull { it.clockOffsetMs }.minOrNull()
                     ?: Race.tabletOffset(sessions.filter { it.complete }.mapNotNull { r -> archive.summary(r.id)?.let { r.created to it.started } })
                     ?: hub?.status(car)?.clockOffset?.toMillis()
-                Race.car(
-                    car, runs, raceIds.toSet(),
+                Race.sessions(
+                    car, runs,
+                    raceParts.map { p ->
+                        RaceSessionInput(
+                            p.id, inParts[p.id].orEmpty().toSet(),
+                            green = p.green?.let { g -> offset?.let { g.toEpochMilli() - it } },
+                            flag = p.flag?.let { f -> offset?.let { f.toEpochMilli() - it } },
+                            edited = p.stints[car]?.map { StintMark(it.start, it.driver) },
+                        )
+                    },
                     drivers = sessions.associate { it.id to it.driver },
-                    edited = racePart.stints[car]?.map { StintMark(it.start, it.driver) },
-                    green = racePart.green?.let { g -> offset?.let { g.toEpochMilli() - it } },
-                    flag = racePart.flag?.let { f -> offset?.let { f.toEpochMilli() - it } },
                 )?.let { c -> c.copy(laps = c.laps.map { l -> if (l.session in liveIds) l.copy(live = true) else l }) }?.let { it to offset }
             }
-            val publicRace = pub.parts.first { it.id == racePart.id }
             RaceResults(
-                publicRace, Race.classify(cars.map { it.first }),
-                racePart.green?.toEpochMilli(), racePart.flag?.toEpochMilli(),
+                raceParts.map { p ->
+                    RaceSessionResults(
+                        pub.parts.first { it.id == p.id }, p.green?.toEpochMilli(), p.flag?.toEpochMilli(),
+                        p.stints.mapValues { (_, list) -> list.map { StintView(it.start, it.driver) } },
+                    )
+                },
+                Race.classify(cars.map { it.first }),
                 cars.mapNotNull { (c, o) -> o?.let { c.car to it } }.toMap(),
-                racePart.stints.mapValues { (_, list) -> list.map { StintView(it.start, it.driver) } },
             )
         }
         val practiceSectors = Results.bestSectors(practice)

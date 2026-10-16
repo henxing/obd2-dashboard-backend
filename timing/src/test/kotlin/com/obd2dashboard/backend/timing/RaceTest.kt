@@ -140,4 +140,67 @@ class RaceTest {
         Race.car("outback", listOf(run(lap("a", 0, sectors = listOf(35.0, 35.0)), offset = W), run(lap("b", 0, sectors = listOf(34.0, 36.0)), offset = W + 100_000)),
             setOf("a", "b"))!!.theoretical shouldBe 69.0
     }
+
+    // M26: a race in sessions, Saturday and Sunday, the car off track overnight.
+    private val night = 16 * 3_600_000L
+    private val saturday = run(lap("sat", 0), lap("sat", 70_000), lap("sat", 140_000, pitIn = true), offset = W)
+    // Sunday: the app started afresh (`at` from 0), its first crossing 16 hours after Saturday's last.
+    private val sunday = run(lap("sun", 30_000, time = 100_000, pitOut = true), lap("sun", 130_000), offset = W + 210_000 + night - 30_000)
+
+    @Test
+    fun `a race in two sessions, one car - laps numbered on, no lap across the night, the night never counted (M26)`() {
+        val race = Race.sessions("outback", listOf(saturday, sunday),
+            listOf(RaceSessionInput("p2", setOf("sat")), RaceSessionInput("p3", setOf("sun"))),
+            drivers = mapOf("sat" to "d-sam", "sun" to "d-alex"))!!
+        race.laps.map { it.number to it.session } shouldBe listOf(1 to "sat", 2 to "sat", 3 to "sat", 4 to "sun", 5 to "sun")
+        race.laps.none { it.source == "restart" } shouldBe true
+        race.seconds shouldBe 210.0 + 170.0
+        // Sunday's new driver is Sunday's first stint, numbered on.
+        race.stints.map { listOf(it.number, it.driver, it.firstLap, it.lastLap) } shouldBe listOf(listOf(1, "d-sam", 1, 3), listOf(2, "d-alex", 4, 5))
+        race.laps.map { it.stint } shouldBe listOf(1, 1, 1, 2, 2)
+        race.sessions shouldBe listOf(RaceSessionSpan("p2", 1, 3, 210.0), RaceSessionSpan("p3", 4, 2, 170.0))
+        race.best!!.number shouldBe 1
+    }
+
+    @Test
+    fun `each session's flags fall on its own laps, the race has the first green flag and the last chequered flag (M26)`() {
+        val race = Race.sessions("outback", listOf(saturday, sunday), listOf(
+            RaceSessionInput("p2", setOf("sat"), green = W + 10_000, flag = W + 150_000),
+            RaceSessionInput("p3", setOf("sun"), green = W + 210_000 + night + 50_000),
+        ))!!
+        race.sessions.map { it.greenLap to it.flagLap } shouldBe listOf(1 to 3, 4 to null)
+        race.greenLap shouldBe 1
+        race.flagLap shouldBe null
+    }
+
+    @Test
+    fun `one session is exactly the race as before, and a session the car missed is noted with no laps (M26)`() {
+        Race.sessions("outback", listOf(oneRun), listOf(RaceSessionInput("p1", raceSessions)), drivers = mapOf("c1" to "d-sam", "c2" to "d-alex", "c3" to "d-sam"))!!
+            .copy(sessions = emptyList()) shouldBe Race.car("outback", listOf(oneRun), raceSessions, drivers = mapOf("c1" to "d-sam", "c2" to "d-alex", "c3" to "d-sam"))
+        val missed = Race.sessions("outback", listOf(saturday), listOf(RaceSessionInput("p2", setOf("sat")), RaceSessionInput("p3", setOf("sun"))))!!
+        missed.sessions shouldBe listOf(RaceSessionSpan("p2", 1, 3, 210.0), RaceSessionSpan("p3"))
+        Race.sessions("outback", listOf(saturday), listOf(RaceSessionInput("p3", setOf("sun")))) shouldBe null
+    }
+
+    @Test
+    fun `a restart within a session is still bridged, and edited stints stay in their session (M26)`() {
+        // Saturday's app restarted 60 s after its last crossing: bridged. Then the night: not.
+        val satB = run(lap("sat2", 20_000), offset = W + 210_000 + 60_000 - 20_000)
+        val sunday2 = run(lap("sun", 30_000, time = 100_000, pitOut = true), lap("sun", 130_000), offset = W + 340_000 + night - 30_000)
+        val race = Race.sessions("outback", listOf(saturday, satB, sunday2), listOf(
+            RaceSessionInput("p2", setOf("sat", "sat2"), edited = listOf(StintMark(W, "d-sam"), StintMark(W + 140_000, "d-kim"))),
+            RaceSessionInput("p3", setOf("sun")),
+        ), drivers = mapOf("sun" to "d-alex"))!!
+        race.laps.map { it.source } shouldBe listOf("retimed", "retimed", "retimed", "restart", "retimed", "retimed", "retimed")
+        race.stints.map { Triple(it.driver, it.firstLap, it.lastLap) } shouldBe listOf(Triple("d-sam", 1, 2), Triple("d-kim", 3, 5), Triple("d-alex", 6, 7))
+        race.stintsEdited shouldBe true
+    }
+
+    @Test
+    fun `two cars over two sessions, classified by laps across both, then time (M26)`() {
+        val inputs = listOf(RaceSessionInput("p2", setOf("sat")), RaceSessionInput("p3", setOf("sun")))
+        val both = Race.sessions("outback", listOf(saturday, sunday), inputs)!!
+        val saturdayOnly = Race.sessions("gti", listOf(run(lap("sat", 0, time = 60_000), lap("sat", 60_000, time = 60_000), lap("sat", 120_000, time = 60_000), lap("sat", 180_000, time = 60_000))), inputs)!!
+        Race.classify(listOf(saturdayOnly, both)).map { it.car } shouldBe listOf("outback", "gti")
+    }
 }

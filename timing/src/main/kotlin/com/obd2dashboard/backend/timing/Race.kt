@@ -67,9 +67,31 @@ public data class CarRace(
     val flagLap: Int? = null,
     /** Whether the stints are the default (split at every stop) or as edited. */
     val stintsEdited: Boolean = false,
+    /** A race in sessions (M26): where each began, its laps, time and flags. One for a race run in one. */
+    val sessions: List<RaceSessionSpan> = emptyList(),
     /** The best of each sector over the race (§22.6's rule), and their sum when every sector has one (M16.2). */
     val bestSectors: List<Double?> = emptyList(),
     val theoretical: Double? = null,
+)
+
+/** One session of a race in sessions (M26): its part, its first lap (none if the car didn't run in it), its laps and time, and where its flags fell. */
+@Serializable
+public data class RaceSessionSpan(
+    val part: String,
+    val firstLap: Int? = null,
+    val laps: Int = 0,
+    val seconds: Double = 0.0,
+    val greenLap: Int? = null,
+    val flagLap: Int? = null,
+)
+
+/** A session of the race (M26), a race part: its sessions, flags already on the tablet's clock, and stints as edited. */
+public data class RaceSessionInput(
+    val part: String,
+    val sessions: Set<String>,
+    val green: Long? = null,
+    val flag: Long? = null,
+    val edited: List<StintMark>? = null,
 )
 
 /** A stint's start as edited, on the tablet's clock, and who drove it. */
@@ -130,6 +152,52 @@ public object Race {
             stintsEdited = edited != null && edited.isNotEmpty(),
             bestSectors = bestSectors(laps),
             theoretical = Consistency.theoreticalBest(bestSectors(laps)),
+        )
+    }
+
+    /**
+     * **A race in sessions** (M26: practice Friday, the race Saturday and
+     * Sunday, the car off track overnight): each session timed as [car] times
+     * a race, then joined. Laps and stints numbered through; no lap across the
+     * break between two (a restart within one is still bridged); a stint never
+     * crosses one; the time is each session's added up, so the night never
+     * counts. One session is exactly [car].
+     */
+    public fun sessions(
+        car: String,
+        runs: List<RunTiming>,
+        sessions: List<RaceSessionInput>,
+        drivers: Map<String, String?> = emptyMap(),
+    ): CarRace? {
+        val each = sessions.map { s -> s to car(car, runs, s.sessions, drivers, s.edited, s.green, s.flag) }
+        val raced = each.mapNotNull { it.second }
+        if (raced.isEmpty()) return null
+        val laps = mutableListOf<RaceLap>()
+        val stops = mutableListOf<RaceStop>()
+        val stints = mutableListOf<RaceStint>()
+        val spans = mutableListOf<RaceSessionSpan>()
+        for ((input, race) in each) {
+            if (race == null) { spans += RaceSessionSpan(input.part); continue }
+            val lapsBefore = laps.size
+            val stintsBefore = stints.size
+            fun lapNumber(n: Int?) = n?.let { it + lapsBefore }
+            laps += race.laps.map { it.copy(number = it.number + lapsBefore, stint = it.stint + stintsBefore) }
+            stops += race.stops.map { it.copy(lap = it.lap + lapsBefore) }
+            stints += race.stints.map { it.copy(number = it.number + stintsBefore, firstLap = lapNumber(it.firstLap), lastLap = lapNumber(it.lastLap)) }
+            spans += RaceSessionSpan(input.part, lapsBefore + 1, race.laps.size, race.seconds, lapNumber(race.greenLap), lapNumber(race.flagLap))
+        }
+        val best = bestSectors(laps)
+        return CarRace(
+            car, laps, stops, stints,
+            seconds = seconds(raced.sumOf { it.seconds } * 1000),
+            best = laps.filter(::onTrack).minByOrNull { it.time },
+            // The race's own: its first session's green flag, its last session's flag.
+            greenLap = spans.firstOrNull { it.firstLap != null }?.greenLap,
+            flagLap = spans.lastOrNull { it.firstLap != null }?.flagLap,
+            stintsEdited = raced.any { it.stintsEdited },
+            bestSectors = best,
+            theoretical = Consistency.theoreticalBest(best),
+            sessions = spans,
         )
     }
 

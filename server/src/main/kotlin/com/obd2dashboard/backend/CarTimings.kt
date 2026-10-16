@@ -10,6 +10,7 @@ import com.obd2dashboard.backend.events.PartKind
 import com.obd2dashboard.backend.live.LiveHub
 import com.obd2dashboard.backend.timing.Provisional
 import com.obd2dashboard.backend.timing.RunTiming
+import com.obd2dashboard.backend.timing.RaceSessionInput
 import com.obd2dashboard.backend.timing.StintMark
 import java.util.concurrent.ConcurrentHashMap
 
@@ -63,8 +64,11 @@ class CarTimings(
         val layout = event?.layout ?: runs.lastOrNull { session in it.sessions }?.layout ?: runs.lastOrNull()?.layout
         val counted = if (event != null) eventSessions + session else runs.flatMap { it.sessions }.toSet()
         val part = inEvent?.second
+        // The race's sessions up to the one the car's in (M26): Sunday's lap count goes on from Saturday's.
         val race = part?.takeIf { it.kind == PartKind.RACE }?.let { p ->
-            RaceNowInput(partOf[p.id].orEmpty().toSet() + session, p.stints[car]?.map { StintMark(it.start, it.driver) }, null, null)
+            RaceNowInput(event?.races.orEmpty().filter { !it.start.isAfter(p.start) }.map { r ->
+                RaceSessionInput(r.id, partOf[r.id].orEmpty().toSet() + listOfNotNull(session.takeIf { r.id == p.id }), edited = r.stints[car]?.map { StintMark(it.start, it.driver) })
+            })
         }
         return Standings.of(
             car, session, layout?.let { CourseAt(course.id, course.version, it) }, runs, counted, sessionDrivers, race, drivers,

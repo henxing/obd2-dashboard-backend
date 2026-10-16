@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import { signin } from './lib/signin'
-  import { whereText, type PublicEvent } from './lib/eventResults'
+  import { dateText, whereText, type PublicEvent } from './lib/eventResults'
   import HiddenBadge from './HiddenBadge.svelte'
 
   // Events, public (M14.5), newest first.
@@ -33,7 +33,7 @@
       {#each events as e (e.id)}
         <li>
           <a href={`/events/${e.id}`}><strong>{e.name}</strong></a>{#if e.hidden}<HiddenBadge />{/if}
-          <span class="muted">{[e.date, whereText(e), e.cars.map((c) => c.name).join(', ')].filter(Boolean).join(' · ')}</span>
+          <span class="muted">{[dateText(e), whereText(e), e.cars.map((c) => c.name).join(', ')].filter(Boolean).join(' · ')}</span>
         </li>
       {/each}
     </ul>

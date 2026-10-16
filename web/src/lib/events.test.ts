@@ -28,6 +28,17 @@ describe('an event in the editor (M14.3)', () => {
     expect(first.id).toBeUndefined() // the server gives it one
   })
 
+  it('another session of the race is the next morning’s, from 9:00, named in turn (M26)', () => {
+    const saturday = { ...newPart([], 'race', '2026-10-03'), start: fromLocalInput('2026-10-03T12:00')!, end: fromLocalInput('2026-10-03T18:00')! }
+    const sunday = newPart([saturday], 'race', '2026-10-03')
+    expect(sunday.name).toBe('Race, session 2')
+    expect(sunday.start).toBe(fromLocalInput('2026-10-04T09:00'))
+    expect(sunday.end - sunday.start).toBe(6 * 3_600_000)
+    expect(newPart([saturday, sunday], 'race', '2026-10-03').name).toBe('Race, session 3')
+    // A practice still follows on where the last part ended.
+    expect(newPart([saturday], 'practice', '2026-10-03').start).toBe(saturday.end)
+  })
+
   it('a session added by hand is in that part only, and no longer removed from it', () => {
     const parts = addSession([part('p1', ['s']), part('p2', [], ['s'])], 'p2', 's')
     expect(parts).toEqual([part('p1'), part('p2', ['s'])])
@@ -42,7 +53,9 @@ describe('an event in the editor (M14.3)', () => {
 
   it('what a save sends', () => {
     const e = { name: 'NHMS', date: '2026-10-04', course: 'nhms', layout: 'road', cars: ['outback'], parts: [part('p1')] }
-    expect(saveBody(e, 3)).toEqual({ expected: 3, ...e })
+    expect(saveBody(e, 3)).toEqual({ expected: 3, ...e, endDate: null })
+    expect(saveBody({ ...e, endDate: '2026-10-06' }, 3).endDate).toBe('2026-10-06') // over several days (M26)
+    expect(saveBody({ ...e, endDate: '' }, 3).endDate).toBeNull()
   })
 
   it('a driver’s code from their name, and when a session was heard', () => {

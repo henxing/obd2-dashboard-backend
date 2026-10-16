@@ -109,9 +109,10 @@ public class FirestoreEventStore(private val db: Firestore) : EventStore {
         public fun connect(projectId: String): FirestoreEventStore = FirestoreEventStore(firestore(projectId))
 
         /** The event's fields; its id is the document's. */
-        internal fun Event.toFields(): Map<String, Any> = mapOf(
+        internal fun Event.toFields(): Map<String, Any> = listOfNotNull(
             "name" to name,
             "date" to date,
+            endDate?.let { "endDate" to it },
             "course" to course,
             "layout" to layout,
             "cars" to cars,
@@ -134,7 +135,7 @@ public class FirestoreEventStore(private val db: Firestore) : EventStore {
             },
             REVISION to revision.toLong(),
             "updated" to updated.toTimestamp(),
-        )
+        ).toMap()
 
         internal fun eventFrom(id: String, data: Map<String, Any?>): Event {
             fun string(key: String) = data[key] as? String ?: error("event $id has no $key")
@@ -165,6 +166,7 @@ public class FirestoreEventStore(private val db: Firestore) : EventStore {
                 },
                 revision = (data[REVISION] as? Number)?.toInt() ?: 0,
                 updated = (data["updated"] as? Timestamp)?.toInstant() ?: Instant.EPOCH,
+                endDate = data["endDate"] as? String,
             )
         }
 

@@ -491,6 +491,17 @@ class AdminTest {
             it.stints.keys shouldBe setOf("yaris")
             it.end shouldBe Instant.parse("2026-10-04T22:30:00Z")
         }
+        // A weekend (M26): practice Friday, the race Saturday and Sunday, in two sessions.
+        val weekend = file("""{"id":"nhms-october","name":"NHMS October","date":"2026-10-02","endDate":"2026-10-04","course":"nhms","layout":"road","cars":["yaris"],
+            "parts":[{"id":"p1","kind":"practice","name":"Practice","start":"2026-10-02T09:00:00-04:00","end":"2026-10-02T17:00:00-04:00"},
+                     {"id":"p2","kind":"race","name":"Race, Saturday","start":"2026-10-03T12:00:00-04:00","end":"2026-10-03T18:30:00-04:00"},
+                     {"kind":"race","name":"Race, Sunday","start":"2026-10-04T09:00:00-04:00","end":"2026-10-04T15:00:00-04:00"}]}""")
+        run("import-event $weekend").statusCode shouldBe 0
+        runBlocking { events.get("nhms-october")!! }.let { e ->
+            e.endDate shouldBe "2026-10-04"
+            e.races.map { it.id to it.name } shouldBe listOf("p2" to "Race, Saturday", "p3" to "Race, Sunday")
+        }
+        run("events").output shouldContain "2026-10-02 to 2026-10-04"
 
         val bad = file("""{"id":"Bad","name":"x","date":"4 Oct","course":"nowhere","layout":"road","cars":["nope"],
             "parts":[{"kind":"practice","name":"P","start":"9am","end":"2026-10-04T10:00:00-04:00"}]}""")

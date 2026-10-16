@@ -4,8 +4,8 @@
   import { signin } from './lib/signin'
   import { fromLocalInput, toLocalInput } from './lib/events'
   import {
-    marksOf, mergeWithPrevious, raceClock, racePath, sendRaceEdit, setDriver, splitAt, timeOfDay,
-    type CarRace, type RaceLap, type RaceResults, type StintMark,
+    flagsAt, lapsIn, marksOf, mergeWithPrevious, raceClock, racePath, sendRaceEdit, sessionStartingAt, setDriver, splitAt, stintsIn, timeOfDay,
+    type CarRace, type RaceLap, type RaceResults, type RaceSessionResults, type StintMark,
   } from './lib/race'
   import { lapTime } from './lib/sessions'
   import { lapLink } from './lib/laps'
@@ -14,6 +14,7 @@
   import ComparePick from './ComparePick.svelte'
 
   // The race (M15.4): one timeline per car, and for the admin or a car's crew, its flags and stints.
+  // A race in sessions (M26: Saturday's and Sunday's) is one race; each session has its own flags and stints.
   let { race, eventId, revision, carName, onChanged, course, layout }: {
     race: RaceResults
     eventId: string
@@ -31,11 +32,17 @@
 
   let drivers: Driver[] = $state.raw([])
   let setters: Record<string, DriverSetter> = $state({})
-  let editing: string | null = $state(null) // the car whose stints are open
+  let editing: { car: string; part: string } | null = $state(null) // the car and session whose stints are open
   let marks: StintMark[] = $state.raw([])
   let splitLap = $state('')
-  let green = $state('')
-  let flag = $state('')
+  // Each session's flags as typed, by its part's id.
+  let green: Record<string, string> = $state({})
+  let flag: Record<string, string> = $state({})
+  const inSessions = $derived(race.sessions.length > 1)
+  const sessionName = (part: string) => race.sessions.find((s) => s.part.id === part)?.part.name ?? part
+  /** A time as "Sat 14:05:00" in a race over days, else "14:05:00". */
+  const clock = (ms: number) =>
+    new Date(ms).toLocaleString('en-GB', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', ...(inSessions ? { weekday: 'short' } : {}) })
   let busy = $state(false)
   let message: string | null = $state(null)
 
@@ -46,8 +53,10 @@
 
   onMount(async () => {
     drivers = await fetch('/api/drivers').then((r) => (r.ok ? r.json() : [])).catch(() => [])
-    green = race.green ? toSeconds(race.green) : ''
-    flag = race.flag ? toSeconds(race.flag) : ''
+    for (const s of race.sessions) {
+      green[s.part.id] = s.green ? toSeconds(s.green) : ''
+      flag[s.part.id] = s.flag ? toSeconds(s.flag) : ''
+    }
   })
 
   // Who may set each car's flags and stints: asked again when the header signs in or out (M21.1).
@@ -75,20 +84,21 @@
     }
   }
 
-  function saveFlags(car: string, who: 'admin' | 'crew') {
-    const body = { expected: revision, green: fromLocalInput(green), flag: fromLocalInput(flag) }
+  function saveFlags(s: RaceSessionResults, car: string, who: 'admin' | 'crew') {
+    const body = { expected: revision, green: fromLocalInput(green[s.part.id] ?? ''), flag: fromLocalInput(flag[s.part.id] ?? ''), part: s.part.id }
     return edit(() => sendRaceEdit(racePath(who, eventId, car, 'flags'), body))
   }
 
-  function open(c: CarRace) {
-    editing = c.car
-    marks = marksOf(c)
+  /** [c]'s stints in session [part], to edit: a stint never crosses one. */
+  function open(c: CarRace, part: string) {
+    editing = { car: c.car, part }
+    marks = marksOf(inSessions ? { ...c, stints: stintsIn(c, part) } : c) // in one, every stint, one with no laps yet too
     splitLap = ''
   }
 
-  function saveStints(car: string, who: 'admin' | 'crew', stints: StintMark[] | null) {
+  function saveStints(car: string, part: string, who: 'admin' | 'crew', stints: StintMark[] | null) {
     return edit(async () => {
-      const r = await sendRaceEdit(racePath(who, eventId, car, 'stints'), { expected: revision, stints })
+      const r = await sendRaceEdit(racePath(who, eventId, car, 'stints'), { expected: revision, stints, part })
       editing = null
       return r
     })
@@ -96,11 +106,15 @@
 </script>
 
 <section class="panel">
-  <h2>{race.part.name}</h2>
+  <h2>{inSessions ? 'The race' : race.sessions[0]?.part.name}</h2>
   <p class="muted small">
-    {#if race.green}Green flag {new Date(race.green).toLocaleTimeString('en-GB', { hour12: false })}{:else}No green flag entered{/if}
-    · {#if race.flag}flag {new Date(race.flag).toLocaleTimeString('en-GB', { hour12: false })}{:else}no flag entered{/if}.
+    {#each race.sessions as s, i (s.part.id)}
+      {#if inSessions}{i > 0 ? ' ' : ''}<strong>{s.part.name}:</strong>{/if}
+      {#if s.green}Green flag {clock(s.green)}{:else}No green flag entered{/if}
+      · {#if s.flag}flag {clock(s.flag)}{:else}no flag entered{/if}.
+    {/each}
     Every lap counts, before the green flag and after the flag too.
+    {#if inSessions}One race in {race.sessions.length} sessions: laps and time add up across them, and the break between is never a lap.{/if}
     {#if race.cars.some((c) => c.laps.some((l) => l.live))}Laps marked live are the stint being driven: as the tablet sent them, until its session is uploaded.{/if}
   </p>
 
@@ -123,13 +137,17 @@
     {@const car = Object.entries(setters).find(([, s]) => s)?.[0] ?? race.cars[0]?.car ?? ''}
     <div class="edit">
       <h3>The flags</h3>
-      <p class="row">
-        <label>Green flag <input type="datetime-local" step="1" bind:value={green} /></label>
-        <button onclick={() => (green = toSeconds(Date.now()))}>Now</button>
-        <label>Flag <input type="datetime-local" step="1" bind:value={flag} /></label>
-        <button onclick={() => (flag = toSeconds(Date.now()))}>Now</button>
-        <button class="primary" disabled={busy} onclick={() => saveFlags(car, anyone)}>Save the flags</button>
-      </p>
+      {#each race.sessions as s (s.part.id)}
+        {@const id = s.part.id}
+        <p class="row">
+          {#if inSessions}<strong>{s.part.name}</strong>{/if}
+          <label>Green flag <input type="datetime-local" step="1" bind:value={green[id]} /></label>
+          <button onclick={() => (green[id] = toSeconds(Date.now()))}>Now</button>
+          <label>Flag <input type="datetime-local" step="1" bind:value={flag[id]} /></label>
+          <button onclick={() => (flag[id] = toSeconds(Date.now()))}>Now</button>
+          <button class="primary" disabled={busy} onclick={() => saveFlags(s, car, anyone)}>Save the flags</button>
+        </p>
+      {/each}
     </div>
   {/if}
   {#if message}<p class="error">{message}</p>{/if}
@@ -139,10 +157,10 @@
     {@const who = setters[c.car]}
     <h3>{carName(c.car)}</h3>
     <table class="stints">
-      <thead><tr><th>Stint</th><th>Driver</th><th>Laps</th><th>Time</th><th>Best</th><th>Median</th><th>Spread</th></tr></thead>
+      <thead><tr><th>Stint</th>{#if inSessions}<th>Session</th>{/if}<th>Driver</th><th>Laps</th><th>Time</th><th>Best</th><th>Median</th><th>Spread</th></tr></thead>
       <tbody>
         {#each c.stints as s (s.number)}
-          <tr><td>{s.number}</td><td>{#if s.driver}<a href={`/drivers/${s.driver}`}>{driverName(s.driver)}</a>{:else}{driverName(s.driver)}{/if}</td>
+          <tr><td>{s.number}</td>{#if inSessions}<td>{sessionName(race.sessions.find((r) => stintsIn(c, r.part.id).includes(s))?.part.id ?? '')}</td>{/if}<td>{#if s.driver}<a href={`/drivers/${s.driver}`}>{driverName(s.driver)}</a>{:else}{driverName(s.driver)}{/if}</td>
             <td>{s.laps > 0 ? `${s.firstLap}–${s.lastLap} (${s.laps})` : '—'}</td><td>{raceClock(s.seconds)}</td>
             <td>{s.best ? lapTime(s.best) : '—'}</td>
             <td>{s.consistency ? lapTime(s.consistency.median) : '—'}</td><td>{s.consistency ? `± ${s.consistency.spread.toFixed(3)} s` : '—'}</td></tr>
@@ -156,11 +174,13 @@
     {/if}
 
     {#if who}
-      {#if editing === c.car}
+      {#if editing?.car === c.car}
+        {@const part = editing.part}
         <div class="edit">
+          {#if inSessions}<p><strong>{sessionName(part)}</strong></p>{/if}
           {#each marks as m, i (m.start)}
             <p class="row">
-              Stint {i + 1}, from {timeOfDay(m.start, offset) || `lap ${c.laps.find((l) => l.end > m.start)?.number ?? '—'}`}:
+              Stint {i + 1}, from {timeOfDay(m.start, offset) || `lap ${lapsIn(c, part).find((l) => l.end > m.start)?.number ?? '—'}`}:
               <select value={m.driver ?? ''} onchange={(e) => (marks = setDriver(marks, i, e.currentTarget.value || null))} aria-label={`Stint ${i + 1}'s driver`}>
                 <option value="">Driver not set</option>
                 {#each drivers as d (d.id)}<option value={d.id}>{d.name} ({d.code})</option>{/each}
@@ -170,16 +190,22 @@
           {/each}
           <p class="row">
             <label>Split at lap <input class="lap" bind:value={splitLap} inputmode="numeric" /></label>
-            <button onclick={() => (marks = splitAt(marks, c.laps, Number(splitLap)))}>Split</button>
+            <button onclick={() => (marks = splitAt(marks, lapsIn(c, part), Number(splitLap)))}>Split</button>
           </p>
           <p class="row">
-            <button class="primary" disabled={busy} onclick={() => saveStints(c.car, who, marks)}>Save the stints</button>
-            <button disabled={busy} onclick={() => saveStints(c.car, who, null)}>Back to splitting at every stop</button>
+            <button class="primary" disabled={busy} onclick={() => saveStints(c.car, part, who, marks)}>Save the stints</button>
+            <button disabled={busy} onclick={() => saveStints(c.car, part, who, null)}>Back to splitting at every stop</button>
             <button onclick={() => (editing = null)}>Cancel</button>
           </p>
         </div>
       {:else}
-        <p><button onclick={() => open(c)}>Edit stints</button></p>
+        <p class="row">
+          {#each race.sessions as s (s.part.id)}
+            {#if lapsIn(c, s.part.id).length > 0}
+              <button onclick={() => open(c, s.part.id)}>{inSessions ? `Edit ${s.part.name}’s stints` : 'Edit stints'}</button>
+            {/if}
+          {/each}
+        </p>
       {/if}
     {/if}
 
@@ -189,14 +215,17 @@
         <thead><tr><th>Lap</th><th>Time</th><th>Driver</th><th>Time of day</th><th></th></tr></thead>
         <tbody>
           {#each c.laps as l (l.number)}
+            {@const starts = sessionStartingAt(c, l.number)}
+            {@const flags = flagsAt(c, l.number)}
+            {#if starts}<tr class="session"><td colspan="6">{sessionName(starts)}</td></tr>{/if}
             <tr class:best={c.best?.number === l.number}>
               <td><a href={lapLink(c.car, l.session, l.start, l.end)}>{l.number}</a></td><td class="time">{lapTime(l.time)}</td>
               <td>{driverName(c.stints[l.stint - 1]?.driver)}</td>
               <td class="muted">{timeOfDay(l.end, offset)}</td>
               <td class="muted">
                 {[
-                  l.number === c.greenLap ? 'Green flag' : '',
-                  l.number === c.flagLap ? 'Flag' : '',
+                  flags.green ? 'Green flag' : '',
+                  flags.flag ? 'Flag' : '',
                   l.source === 'restart' ? 'Across a restart of the app' : l.source === 'retimed' ? 'Re-timed' : '',
                   l.pitIn ? 'Into the pits' : '',
                   l.pitOut ? 'Out of the pits' : '',
@@ -227,4 +256,5 @@
   .lap { width: 4em; }
   .error { color: var(--critical); }
   details { margin-top: 8px; }
+  tr.session td { font-weight: 600; color: var(--muted); padding-top: 10px; }
 </style>

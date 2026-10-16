@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { marksOf, mergeWithPrevious, raceClock, racePath, sendRaceEdit, setDriver, splitAt, timeOfDay, type CarRace, type RaceLap } from './race'
+import { flagsAt, lapsIn, marksOf, mergeWithPrevious, raceClock, racePath, sendRaceEdit, sessionStartingAt, setDriver, splitAt, stintsIn, timeOfDay, type CarRace, type RaceLap } from './race'
 
 const lap = (number: number, start: number): RaceLap =>
   ({ number, session: 's', start, end: start + 70_000, time: 70, sectors: [], pitIn: false, pitOut: false, source: 'tablet', stint: 1 })
@@ -44,5 +44,35 @@ describe('the race (M15.4)', () => {
     expect(await sendRaceEdit('/x', {}, answer(200, { revision: 4 }))).toBe(4)
     await expect(sendRaceEdit('/x', {}, answer(400, { message: 'No.', problems: ['the flag falls after the green flag'] }))).rejects.toThrow('No. the flag falls after the green flag')
     await expect(sendRaceEdit('/x', {}, answer(409, { message: 'Someone changed this event' }))).rejects.toThrow('Someone changed')
+  })
+})
+
+describe('a race in sessions (M26)', () => {
+  // Saturday: laps 1–3, Sam; Sunday: laps 4–5, Alex.
+  const weekend = {
+    car: 'outback', laps: [...laps.slice(0, 3), lap(4, 60_000_000), lap(5, 60_070_000)], stops: [], seconds: 350,
+    stints: [{ number: 1, driver: 'd-sam', start: 0, firstLap: 1, lastLap: 3, laps: 3, seconds: 210 }, { number: 2, driver: 'd-alex', start: 60_000_000, firstLap: 4, lastLap: 5, laps: 2, seconds: 140 }],
+    greenLap: 1, flagLap: null,
+    sessions: [{ part: 'p2', firstLap: 1, laps: 3, seconds: 210, greenLap: 1, flagLap: 3 }, { part: 'p3', firstLap: 4, laps: 2, seconds: 140, greenLap: 4 }],
+  } as CarRace
+
+  it('each session’s laps and stints', () => {
+    expect(lapsIn(weekend, 'p2').map((l) => l.number)).toEqual([1, 2, 3])
+    expect(lapsIn(weekend, 'p3').map((l) => l.number)).toEqual([4, 5])
+    expect(stintsIn(weekend, 'p3').map((s) => s.driver)).toEqual(['d-alex'])
+    // A session the car missed has none; a race in one is all of it.
+    expect(lapsIn({ ...weekend, sessions: [...weekend.sessions!, { part: 'p4', laps: 0, seconds: 0 }] }, 'p4')).toEqual([])
+    expect(lapsIn({ ...weekend, sessions: [weekend.sessions![0]!] }, 'p2')).toHaveLength(5)
+  })
+
+  it('where each session began, and every session’s flags marked', () => {
+    expect(sessionStartingAt(weekend, 4)).toBe('p3')
+    expect(sessionStartingAt(weekend, 1)).toBe('p2')
+    expect(sessionStartingAt(weekend, 2)).toBeNull()
+    expect(sessionStartingAt({ ...weekend, sessions: [weekend.sessions![0]!] }, 1)).toBeNull() // a race in one: nothing to mark
+    expect(flagsAt(weekend, 3)).toEqual({ green: false, flag: true })
+    expect(flagsAt(weekend, 4)).toEqual({ green: true, flag: false })
+    // Before M26, a car's race has no sessions: its own flags.
+    expect(flagsAt({ ...weekend, sessions: undefined, flagLap: 5 }, 5)).toEqual({ green: false, flag: true })
   })
 })

@@ -33,6 +33,14 @@ class EventMappingTest {
     }
 
     @Test
+    fun `a race in sessions over several days round-trips, and a one-day event writes no end date (M26)`() {
+        val sunday = Part("p4", PartKind.RACE, "Race, Sunday", t.plusSeconds(86_400), t.plusSeconds(86_400 + 4 * 3600), green = t.plusSeconds(86_500))
+        val weekend = event.copy(parts = event.parts + sunday, endDate = "2026-10-05")
+        eventFrom("nhms-october", weekend.toFields()) shouldBe weekend
+        event.toFields().containsKey("endDate") shouldBe false
+    }
+
+    @Test
     fun `a part's kind is stored in words, and no list holds a list`() {
         @Suppress("UNCHECKED_CAST")
         val parts = event.toFields()["parts"] as List<Map<String, Any>>
