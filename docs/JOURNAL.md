@@ -517,7 +517,7 @@ whole drive, the admin page's Download.
   overlay, which then blocked the tab; logged in by the page's own request
   instead.
 
-## 2026-10-16 — NHMS's start/finish line was too short
+## 2026-10-16 — NHMS's start/finish and sector lines were too short
 
 - **Laps went missing when cars ran wide of a 24 m line.** At the October
   practice, from mid-afternoon, passes went 4–29 m beyond the start/finish
@@ -527,6 +527,11 @@ whole drive, the admin page's Download.
   **NHMS version 6** extends it 40 m on that side (the pit lane passes the
   other end), checked by the course rules and against the day's track: all
   29 passes count. Re-timing gave the session 32 laps for 24.
+- **Its sector lines were 24 m too, and missed the same way** (1–15 m wide,
+  nine laps from 2:16 pm short of a sector or more once version 6 re-timed
+  them all). **NHMS version 7** extends each only where cars ran wide, 6–20 m,
+  short of the other track 17–25 m from some ends: every pass on the day
+  crosses each line once, and all 32 laps have five sectors.
 - **A course saved with `admin.sh import-course` doesn't tell connected
   tablets at once** (only a save through the site does); they find it at
   their next `hello`, or from a `course` frame naming the newer version.
