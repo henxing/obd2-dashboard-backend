@@ -1192,3 +1192,11 @@ stopping and jumping. Both thresholds are set past anything a car does, so
 noise between fixes a tenth of a second apart and a dropout of seconds are
 kept. The drift seen that weekend (5–25 m over several seconds, external
 receiver alone) isn't removable here: the antenna and receiver's.
+
+**Measured after the deploy** (Sunday 12:56, 24,125 positions): spaced a
+median 100 ms (they had been 4 ms), and 48 left out (0.2%): each 30–90 m from
+the fix before but metres from the next, half straight after one of the
+tablet's own fixes (the app falls back to it when the external receiver is
+silent for a second). So what the rule catches there is a fix whose time
+doesn't fit where it is, at a hand-over, not one off in the infield; the
+100 m+ "jumps" seen before were Bluetooth's bunching read as time.

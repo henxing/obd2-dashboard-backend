@@ -402,7 +402,7 @@
           <h2>Where it went</h2>
           <SessionMap t={mapT} lat={mapLat} lon={mapLon} speeds={mapSpeeds} {cursor} focusKey={focus ? focus.join('-') : ''} />
           <p class="muted small">Coloured by speed, blue slow to pink fast. The dot follows the chart's cursor.</p>
-          {#if (view?.positions.dropped ?? 0) > 0}{@const n = view?.positions.dropped ?? 0}<p class="muted small">{n.toLocaleString()} GPS position{n === 1 ? '' : 's'} no car could have reached {n === 1 ? 'is' : 'are'} left out.</p>{/if}
+          {#if (view?.positions.dropped ?? 0) > 0}{@const n = view?.positions.dropped ?? 0}<p class="muted small">{n.toLocaleString()} GPS position{n === 1 ? '' : 's'} that didn’t fit with the one before (too far, too soon) {n === 1 ? 'is' : 'are'} left out.</p>{/if}
         </section>
       {/if}
 
