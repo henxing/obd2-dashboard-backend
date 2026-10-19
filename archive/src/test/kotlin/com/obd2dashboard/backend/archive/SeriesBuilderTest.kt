@@ -43,7 +43,7 @@ class SeriesBuilderTest {
             rpm(100, 900.5), rpm(300, 1200.0),
             sample("diagnostics.mil", 150, "\"flag\":false"), sample("diagnostics.mil", 350, "\"flag\":true"),
         )
-        s.getValue("version").jsonPrimitive.content shouldBe "2"
+        s.getValue("version").jsonPrimitive.content shouldBe "3"
         s.getValue("lastSeq").jsonPrimitive.content shouldBe "350"
         s.getValue("t0").jsonPrimitive.content shouldBe t0.toString()
         s.getValue("signals").jsonArray.single().jsonObject.getValue("unit").jsonPrimitive.content shouldBe "rpm"
@@ -129,7 +129,7 @@ class SeriesBuilderTest {
     fun `positions travel together, and events keep what the page needs`() {
         val s = build(
             sample("gps.position", 0, "\"lat\":43.36,\"lon\":-71.46"),
-            sample("gps.position", 1000, "\"lat\":43.37,\"lon\":-71.47"),
+            sample("gps.position", 1000, "\"lat\":43.3601,\"lon\":-71.4601"),
             """{"type":"stopped","signal":"engine.oil_temperature","reason":"it stopped answering","seq":1,"at":1,"wall":${t0 + 500}}""",
             """{"type":"fault","codes":["P0301"],"seq":2,"at":2,"wall":${t0 + 600}}""",
             """{"type":"gap","missed":12,"seq":3,"at":3,"wall":${t0 + 700}}""",
@@ -137,8 +137,9 @@ class SeriesBuilderTest {
         )
         val p = s.getValue("positions").jsonObject
         p.getValue("t").texts() shouldBe listOf("0", "1000")
-        p.getValue("lat").texts() shouldBe listOf("43.36", "43.37")
-        p.getValue("lon").texts() shouldBe listOf("-71.46", "-71.47")
+        p.getValue("lat").texts() shouldBe listOf("43.36", "43.3601")
+        p.getValue("lon").texts() shouldBe listOf("-71.46", "-71.4601")
+        p.getValue("dropped").jsonPrimitive.content shouldBe "0"
         val e = s.getValue("events").jsonObject
         e.getValue("stopped").texts() shouldBe listOf("""[500,"engine.oil_temperature","it stopped answering"]""")
         e.getValue("fault").texts() shouldBe listOf("""[600,["P0301"]]""")
@@ -146,6 +147,35 @@ class SeriesBuilderTest {
         val lap = e.getValue("lap").jsonArray.single().jsonArray
         lap[0].jsonPrimitive.content shouldBe "800"
         lap[1].jsonObject.getValue("pitIn").jsonPrimitive.content shouldBe "true" // the whole record, as it came
+    }
+
+    /** A position taken at [fixAt] and heard at [at] (both ms after t0, `at`'s clock as `wall`'s here), [north] metres up. */
+    private fun fix(fixAt: Long?, at: Long, north: Double = 0.0) =
+        """{"type":"sample","signal":"gps.position","lat":${43.36 + north / 111_195.0},"lon":-71.46,${fixAt?.let { "\"fixAt\":$it," } ?: ""}"seq":$at,"at":$at,"wall":${t0 + at}}"""
+
+    @Test
+    fun `a position is placed when the receiver took it, not when the tablet heard it (M28)`() {
+        // Three fixes a tenth of a second apart, handed over together at 480 ms; one without fixAt as it arrived.
+        val s = build(fix(100, 480, 0.0), fix(200, 481, 3.0), fix(300, 482, 6.0), fix(null, 1000, 15.0))
+        s.getValue("positions").jsonObject.getValue("t").texts() shouldBe listOf("100", "200", "300", "1000")
+    }
+
+    @Test
+    fun `positions are written in time order though the wall clock stepped back (M28)`() {
+        val a = """{"type":"sample","signal":"gps.position","lat":43.36,"lon":-71.46,"fixAt":1000,"seq":1,"at":1000,"wall":${t0 + 5000}}"""
+        val b = """{"type":"sample","signal":"gps.position","lat":43.36001,"lon":-71.46,"fixAt":1100,"seq":2,"at":1100,"wall":${t0 + 2100}}"""
+        val p = build(a, b).getValue("positions").jsonObject
+        p.getValue("t").texts() shouldBe listOf("2100", "5000")
+        p.getValue("lat").texts() shouldBe listOf("43.36001", "43.36")
+    }
+
+    @Test
+    fun `a position no car could have reached is left out, and counted (M28)`() {
+        // 25 m/s north, but one fix 200 m off a tenth of a second on.
+        val s = build(fix(0, 0, 0.0), fix(100, 100, 2.5), fix(200, 200, 205.0), fix(300, 300, 7.5), fix(400, 400, 10.0))
+        val p = s.getValue("positions").jsonObject
+        p.getValue("t").texts() shouldBe listOf("0", "100", "300", "400")
+        p.getValue("dropped").jsonPrimitive.content shouldBe "1"
     }
 
     @Test

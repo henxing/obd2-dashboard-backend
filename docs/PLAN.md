@@ -42,6 +42,7 @@ Where this plan and the contract disagree, the contract wins. Fix the plan.
 | **M25** | Hidden: a car, course or event only signed-in users see; to anyone else it doesn't exist, and a hidden car is left out of events | **deployed** (00043): decision 42, [`plans/COMPLETED.md`](plans/COMPLETED.md) |
 | **M26** | A race in sessions: one race over several race parts (Saturday and Sunday), no lap across the night, most laps across them all; events over several days | **deployed** (00044): decision 43, [`plans/COMPLETED.md`](plans/COMPLETED.md) |
 | **M27** | Driver changes within a session: split a session where the driver changed, each part's laps its driver's (practice, race stints, live, driver pages) | **deployed** (00045): decision 44, [`plans/COMPLETED.md`](plans/COMPLETED.md) |
+| **M28** | A session's GPS positions at the receiver's time (not when the tablet heard them, which Bluetooth bunches), and positions no car could reach left out of the map and speeds; lap timing unchanged | built: decision 45, [`plans/M28-GPS-POSITIONS.md`](plans/M28-GPS-POSITIONS.md) |
 
 **How a milestone runs**, as in the app:
 - A plan in `docs/plans/` sketches every step.

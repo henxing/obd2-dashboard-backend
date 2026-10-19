@@ -40,6 +40,8 @@ public class SeriesBuilder {
     private val states = LinkedHashMap<String, MutableList<Triple<Long, Long?, String?>>>()
     private val sets = LinkedHashMap<String, MutableList<Pair<Long, List<String>>>>()
     private val positions = Triple(LongList(), DoubleList(), DoubleList())
+    /** Positions no car could have reached are left out (M28). */
+    private val fixes = FixFilter()
     private val stopped = mutableListOf<Triple<Long, String, String>>()
     private val faults = mutableListOf<Pair<Long, List<String>>>()
     private val gaps = mutableListOf<Pair<Long, Long>>()
@@ -74,7 +76,14 @@ public class SeriesBuilder {
             record["lat"] != null -> {
                 val lat = (record["lat"] as? JsonPrimitive)?.doubleOrNull ?: return
                 val lon = (record["lon"] as? JsonPrimitive)?.doubleOrNull ?: return
-                positions.first.add(wall); positions.second.add(lat); positions.third.add(lon)
+                // When the receiver took it (M28, §22.3), on `wall`'s clock: Bluetooth hands fixes over in bursts,
+                // so `wall` alone bunches them. Without `fixAt`, as it arrived.
+                val at = record.long("at")
+                val fixAt = record.long("fixAt")?.takeIf { at != null && it <= at }
+                val t = if (at != null && fixAt != null) wall - (at - fixAt) else wall
+                for (f in fixes.offer(FixFilter.Fix(fixAt ?: at ?: wall, t, lat, lon))) {
+                    positions.first.add(f.t); positions.second.add(f.lat); positions.third.add(f.lon)
+                }
             }
             record["flags"] is JsonArray -> {
                 val now = strings(record["flags"])
@@ -133,13 +142,17 @@ public class SeriesBuilder {
             }
             w.write("]")
         }
+        // In time order: a fix's moment on `wall` steps back with a corrected clock (M11), though its `fixAt` never does.
+        val order = positions.first.let { t -> if ((1 until t.size).all { t[it - 1] <= t[it] }) null else (0 until t.size).sortedBy { t[it] } }
+        fun at(k: Int) = order?.get(k) ?: k
         w.write("""},"positions":{"t":[""")
-        writeLongs(w, positions.first, t0)
+        val n = positions.first.size
+        for (k in 0 until n) { if (k > 0) w.write(","); w.write((positions.first[at(k)] - t0).toString()) }
         w.write("""],"lat":[""")
-        writeDoubles(w, positions.second)
+        for (k in 0 until n) { if (k > 0) w.write(","); w.write(number(positions.second[at(k)])) }
         w.write("""],"lon":[""")
-        writeDoubles(w, positions.third)
-        w.write("""]},"events":{"stopped":[""")
+        for (k in 0 until n) { if (k > 0) w.write(","); w.write(number(positions.third[at(k)])) }
+        w.write("""],"dropped":${fixes.dropped + fixes.held}},"events":{"stopped":[""")
         w.write(stopped.joinToString(",") { (t, signal, reason) -> "[${t - t0},${str(signal)},${str(reason)}]" })
         w.write("""],"fault":[""")
         w.write(faults.joinToString(",") { (t, codes) -> "[${t - t0},[${codes.joinToString(",") { str(it) }}]]" })
@@ -187,23 +200,9 @@ public class SeriesBuilder {
         return at < gapSeqs.size && gapSeqs[at] < to
     }
 
-    private fun writeLongs(w: Writer, values: LongList, t0: Long) {
-        for (i in 0 until values.size) {
-            if (i > 0) w.write(",")
-            w.write((values[i] - t0).toString())
-        }
-    }
-
-    private fun writeDoubles(w: Writer, values: DoubleList) {
-        for (i in 0 until values.size) {
-            if (i > 0) w.write(",")
-            w.write(number(values[i]))
-        }
-    }
-
     public companion object {
-        /** 2: `lastSeq` added (M7.6). */
-        public const val VERSION: Int = 2
+        /** 2: `lastSeq` added (M7.6). 3: positions at the receiver's time, those no car could reach dropped (M28). */
+        public const val VERSION: Int = 3
         public const val BREAK_FACTOR: Int = 5
         public const val MIN_BREAK_MS: Long = 1_000
 

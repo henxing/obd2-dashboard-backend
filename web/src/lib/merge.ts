@@ -43,7 +43,7 @@ export function merge(series: Series | null, live: Rec[], fallbackSignals: Serie
     ? {
         ...series,
         numbers: Object.fromEntries(Object.entries(series.numbers).map(([k, c]) => [k, { t: [...c.t], v: [...c.v] }])),
-        positions: { t: [...series.positions.t], lat: [...series.positions.lat], lon: [...series.positions.lon] },
+        positions: { t: [...series.positions.t], lat: [...series.positions.lat], lon: [...series.positions.lon], dropped: series.positions.dropped },
         events: {
           stopped: [...series.events.stopped], fault: [...series.events.fault], gap: [...series.events.gap], lap: [...series.events.lap],
         },

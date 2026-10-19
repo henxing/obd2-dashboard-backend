@@ -36,7 +36,8 @@ export interface Series {
   numbers: Record<string, { t: number[]; v: (number | null)[] }>
   states: Record<string, [number, number | null, string | null][]>
   sets: Record<string, [number, string[]][]>
-  positions: { t: number[]; lat: number[]; lon: number[] }
+  /** At the receiver's time; [dropped]: how many no car could have reached were left out (M28, version 3). */
+  positions: { t: number[]; lat: number[]; lon: number[]; dropped?: number }
   events: {
     stopped: [number, string, string][]
     fault: [number, string[]][]

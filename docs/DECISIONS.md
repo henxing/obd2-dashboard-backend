@@ -1167,3 +1167,28 @@ a stream, but it just picked up the session".
 counts laps from 1 again when STREAM is switched back on, within one session
 (app 1.0.1). Keyed by number, the car page threw on every update and its
 map froze (Sam: "the dot is frozen"), 2026-10-16.
+
+## 45. A session's positions: at the receiver's time, those no car could reach left out
+
+**Decision.** (M28.) What the site shows of a session's GPS, its series
+(decision 41's full and thinned), is cleaned in two ways; the log never is.
+- **Each position at the moment the receiver took it**: `wall − (at − fixAt)`
+  (§22.3), as it arrived where there's no `fixAt`. Written in time order.
+- **A position no car could have reached is left out**: further than 30 m
+  from the last kept one *and* faster than 90 m/s to get there. Three in a
+  row that are wrong against the last kept but agree with each other say the
+  last kept was the wrong one, and are kept. How many were left out is in the
+  series (`positions.dropped`) and under the session's map.
+- **Lap timing doesn't change**: re-timing is the tablet's rule on the
+  tablet's own fixes, and what stands is decision 33's.
+- **The live lane doesn't change** (the car page's last five minutes, a live
+  session's newest stretch): as the tablet heard each fix.
+
+**Why.** The NHMS race weekend (2026-10-17/18) ran on an external 10 Hz
+receiver over Bluetooth, which hands fixes over in bursts: by arrival, three
+in four positions came within 50 ms of the one before and the rest ~470 ms
+later, which every speed and distance-over-time on the page read as the car
+stopping and jumping. Both thresholds are set past anything a car does, so
+noise between fixes a tenth of a second apart and a dropout of seconds are
+kept. The drift seen that weekend (5–25 m over several seconds, external
+receiver alone) isn't removable here: the antenna and receiver's.

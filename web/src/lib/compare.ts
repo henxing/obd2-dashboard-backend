@@ -96,9 +96,10 @@ export const MARGIN_MS = 3000
  * [track]: distance against **the positions' own clock**, from 0 where the lap
  * crossed its start to the lap's length where it crossed its end, each found
  * between the fixes either side (extrapolated if there's none beyond). The
- * lap's [start] and [end] are the crossings on `fixAt`; the positions are on
- * `wall` at `at`, later by the tablet's delay in hearing a fix, so pinning the
- * lap's ends there would squeeze its first and last stretches.
+ * lap's [start] and [end] are the crossings on `fixAt`; the positions are at
+ * the receiver's time too since M28, but a live session's newest stretch is
+ * still at `at` (when the tablet heard each fix), so the ends are found on the
+ * positions' own clock rather than pinned there.
  */
 export function lapTrace(track: Track, t: readonly number[], lat: readonly number[], lon: readonly number[], start: number, end: number): Trace {
   const L = track.length
