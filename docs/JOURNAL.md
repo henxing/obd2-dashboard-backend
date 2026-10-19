@@ -538,3 +538,28 @@ whole drive, the admin page's Download.
 - **A start/finish line wants to span the whole width a car may use there,
   with room**: a line drawn across one lane of a wide straight times laps
   until someone takes a different line.
+
+## 2026-10-19 — The race weekend's GPS: an external 10 Hz receiver, drifting
+
+- **The NHMS race (2026-10-17/18) ran on an external 10 Hz receiver over
+  Bluetooth** (the app's M54), falling back to the tablet's own GPS whenever
+  it went quiet for a second: 254 hand-overs in Sunday's 12:56 session, about
+  9 minutes of 67 on the tablet's.
+- **The positions drift**, the external receiver's alone: each lap laid over
+  the next sits a median 6.6 m off, 1 in 5 fixes over 15 m and the worst
+  86 m, in smooth stretches lasting seconds (median 2.9 s, up to 26 s), no
+  zigzag. That's the antenna's view of the sky or the receiver's settings,
+  for the tablet side; nothing on the server takes it out.
+- **About 40% of the 10 Hz fixes never arrive** (steps of 6, 9, 13 m at
+  110 km/h, where 3 m is one fix): the receiver's NMEA outrunning its link,
+  most likely.
+- **By arrival, positions came in bursts** (three in four within 50 ms of the
+  last), which read as wild jumps in time-based checks: a first analysis took
+  those, and the site's one-a-second thinned copy, at face value and blamed a
+  1 Hz tablet GPS. Measure GPS on `fixAt`, at full rate. M28 puts the series'
+  positions on `fixAt`.
+- **What M28's filter catches there is small**: 48 of 24,125, fixes whose
+  time doesn't fit where they are, half straight after a tablet fix.
+- **The missing laps and sectors of 2026-10-16** (lines missed by 4–29 m) were
+  as likely the drift as drivers running wide. The longer lines (versions 6
+  and 7) still help, by giving the drift room.

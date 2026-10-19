@@ -851,3 +851,25 @@ Decision 44.
   a drive numbered 1, 2, 1, 2 with the map following and no errors);
   deployed as `00045` with a live stream across it (`1012`, reconnected at
   once).
+
+## M28 — Positions at the receiver's time, those that don't fit left out  ✅ 2026-10-19
+
+Decision 45.
+
+- **The series:** `SeriesBuilder` places each position at `wall − (at − fixAt)`
+  (at `wall` without `fixAt`), writes them in time order, and leaves out what
+  `FixFilter` says (`:archive`): over 30 m from the last kept *and* over
+  90 m/s; three in a row agreeing with each other adopted; a fix no newer than
+  the last dropped. `positions.dropped` counts them. Series version 3, so
+  every session's series is made again on its next view.
+- **Unchanged:** re-timing (decision 33's tablet rule on the tablet's fixes),
+  the live lane.
+- **The site:** the map's note when any were left out; `positions.dropped`
+  through `lib/merge.ts`; `lib/compare.ts`'s note on the positions' clock.
+- **Tests:** `FixFilterTest` (8), `SeriesBuilderTest` (3 new; a test's two
+  positions 1.1 km apart in a second made realistic), `ArchiveServiceTest`'s
+  file names.
+- **Proven:** deployed as `00049`, and the note's wording as `00050`, with
+  one live stream across both (`1012` each time, reconnected at once). Sunday 12:56's series
+  from production: positions a median 100 ms apart (4 ms before), 48 of
+  24,125 left out, each metres from the next kept fix.
