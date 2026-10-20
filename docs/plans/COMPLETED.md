@@ -873,3 +873,35 @@ Decision 45.
   one live stream across both (`1012` each time, reconnected at once). Sunday 12:56's series
   from production: positions a median 100 ms apart (4 ms before), 48 of
   24,125 left out, each metres from the next kept fix.
+
+## M29 — Download an event's data, each car's sessions merged  ✅ 2026-10-20
+
+Decision 46.
+
+- **The button:** "Download event data" on an event's page, for anyone who
+  may edit one of its cars. `GET /api/admin/events/{id}/download`, one at a
+  time (429 otherwise).
+- **The zip** has a folder per part, numbered in time order and named after
+  the part, and a folder per car the downloader may edit. In each:
+  - `raw.jsonl`: the car's sessions in that part, back to back, every line as
+    stored, VIN included (`MergedLog`, `:archive`);
+  - `sessions.json`: headers, drivers and driver changes;
+  - `laps.csv`: the race's laps with stint and stint driver, or a practice's
+    with each stretch's driver; top, low and average km/h from `LapSpeeds`
+    (`:archive`), the page's rule on the same raw read;
+  - `stints.csv`, for race parts.
+
+  At the top: `event.json`, `results.json` and a README naming any cars left
+  out.
+- **Refactor:** the event results moved into `EventResultsService`, shared by
+  the event page and the download. `FixFilter.placed` is now shared by
+  `SeriesBuilder` and `LapSpeeds`.
+- **Tests:** `MergedLogTest` (4), `LapSpeedsTest` (5), `EventDownloadTest` (4).
+  The 429 isn't tested.
+- **Proven:**
+  - On the dev server: four synthetic NHMS sessions, the merged logs byte for
+    byte the sessions' own downloads, drivers on each side of a change.
+  - Deployed as `00051` with a live stream across it (`1012`, reconnected at
+    once).
+  - Sam downloaded the NHMS race weekend in 33.8 s (JOURNAL 2026-10-20).
+

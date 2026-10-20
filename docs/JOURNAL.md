@@ -563,3 +563,30 @@ whole drive, the admin page's Download.
 - **The missing laps and sectors of 2026-10-16** (lines missed by 4–29 m) were
   as likely the drift as drivers running wide. The longer lines (versions 6
   and 7) still help, by giving the drift room.
+
+## 2026-10-20 — M29 deployed; the old revision ran three instances during the build
+
+- **The NHMS download** (Sam, 19:30:47, the Yaris only, every session of the
+  weekend): 33.8 s from request to last byte, about 6 s of it working out the
+  event's results.
+  - The instance's 99th-percentile CPU went from 3% to 31% of one CPU, and
+    memory from 31% to 37% of 1 GiB, for that minute.
+  - The smoke car's next chunk went through at 19:32:11 as usual.
+  - The event page's results took 5–8 s around it, as they did before it.
+- **Three instances of `00050` at once** (`maxScale=1`), during the image
+  build, 19:16–19:23.
+  - Cloud Run started them for "AUTOSCALING".
+  - The smoke car's live socket stayed on the first, while its archive
+    chunks at 19:20 and 19:22 went to the third.
+  - The archive's conditional writes make that safe (decision 17). The live
+    hub's memory doesn't: a viewer served by another instance than its car's
+    tablet would see nothing live until the next drain (decision 7).
+  - The third instance's revision checks timed out ("not draining"). The
+    first's drained with `1012` at 19:23:20, as designed.
+  - Not seen in a deploy before. Worth watching on a race day: a car page
+    showing nothing live while the tablet says it's streaming would be this.
+- **The smoke replay stalled at 19:33** (its socket's ping timed out on the
+  server, and its chunks stopped too) and was killed at its 40-minute limit.
+  It was the replay, not the server: both lanes stopped together, most likely
+  the Mac sleeping (as in M13).
+

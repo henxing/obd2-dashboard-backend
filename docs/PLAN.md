@@ -43,7 +43,7 @@ Where this plan and the contract disagree, the contract wins. Fix the plan.
 | **M26** | A race in sessions: one race over several race parts (Saturday and Sunday), no lap across the night, most laps across them all; events over several days | **deployed** (00044): decision 43, [`plans/COMPLETED.md`](plans/COMPLETED.md) |
 | **M27** | Driver changes within a session: split a session where the driver changed, each part's laps its driver's (practice, race stints, live, driver pages) | **deployed** (00045): decision 44, [`plans/COMPLETED.md`](plans/COMPLETED.md) |
 | **M28** | A session's GPS positions at the receiver's time (not when the tablet heard them, which Bluetooth bunches), and positions no car could reach left out of the map and speeds; lap timing unchanged | **deployed** (00049, 00050): decision 45, [`plans/COMPLETED.md`](plans/COMPLETED.md) |
-| **M29** | Download an event's data: a folder per part (practice, race session 1, race session 2), each car's sessions merged into one raw log (every line as the tablet sent it, VIN included, for the car's editors), with drivers, driver changes, laps, stints and flags beside it | **built**, not deployed: [`plans/M29-RACE-DOWNLOAD.md`](plans/M29-RACE-DOWNLOAD.md), decision 46 |
+| **M29** | Download an event's data: a folder per part (practice, race session 1, race session 2), each car's sessions merged into one raw log (every line as the tablet sent it, VIN included, for the car's editors), with drivers, driver changes, laps, stints and flags beside it | **deployed** (00051): decision 46, [`plans/COMPLETED.md`](plans/COMPLETED.md) |
 
 **How a milestone runs**, as in the app:
 - A plan in `docs/plans/` sketches every step.
