@@ -76,12 +76,7 @@ public class SeriesBuilder {
             record["lat"] != null -> {
                 val lat = (record["lat"] as? JsonPrimitive)?.doubleOrNull ?: return
                 val lon = (record["lon"] as? JsonPrimitive)?.doubleOrNull ?: return
-                // When the receiver took it (M28, §22.3), on `wall`'s clock: Bluetooth hands fixes over in bursts,
-                // so `wall` alone bunches them. Without `fixAt`, as it arrived.
-                val at = record.long("at")
-                val fixAt = record.long("fixAt")?.takeIf { at != null && it <= at }
-                val t = if (at != null && fixAt != null) wall - (at - fixAt) else wall
-                for (f in fixes.offer(FixFilter.Fix(fixAt ?: at ?: wall, t, lat, lon))) {
+                for (f in fixes.offer(FixFilter.placed(record, wall, lat, lon))) {
                     positions.first.add(f.t); positions.second.add(f.lat); positions.third.add(f.lon)
                 }
             }
@@ -235,6 +230,8 @@ internal class LongList {
     }
 
     operator fun get(i: Int): Long = values[i]
+
+    fun clear() { size = 0 }
 }
 
 /** A growable array of doubles, without boxing. */
@@ -249,4 +246,6 @@ internal class DoubleList {
     }
 
     operator fun get(i: Int): Double = values[i]
+
+    fun clear() { size = 0 }
 }

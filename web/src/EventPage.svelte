@@ -7,7 +7,7 @@
   import RaceSection from './RaceSection.svelte'
   import HiddenBadge from './HiddenBadge.svelte'
   import { signin } from './lib/signin'
-  import { allowedFor, NOTHING, type Allowed } from './lib/access'
+  import { allowedFor, mine, NOTHING, type Allowed } from './lib/access'
   import { lapLink } from './lib/laps'
   import type { LapPick } from './lib/comparePick'
   import ComparePick from './ComparePick.svelte'
@@ -51,6 +51,15 @@
     if ($signin.state === 'in') void allowedFor('event', id).then((m) => (may = m))
     else may = NOTHING
   })
+
+  // The event's data (M29): for whoever may edit one of its cars, since the raw logs hold the VIN; only those cars' logs.
+  let yourCars: string[] = $state.raw([])
+  $effect(() => {
+    const cars = results?.event.cars.map((c) => c.slug) ?? []
+    if ($signin.state === 'in' && cars.length > 0) {
+      void mine('car').then((m) => (yourCars = cars.filter((c) => m.has(c)))).catch(() => (yourCars = []))
+    } else yourCars = []
+  })
 </script>
 
 <main>
@@ -62,7 +71,19 @@
   {:else if results}
     {@const e = results.event}
     <h1>{e.name}{#if e.hidden}<HiddenBadge />{/if}</h1>
-    {#if may.edit}<p><a class="button" href={`/events/${id}/edit`}>Edit</a></p>{/if}
+    {#if may.edit || yourCars.length > 0}
+      <p>
+        {#if may.edit}<a class="button" href={`/events/${id}/edit`}>Edit</a>{/if}
+        {#if yourCars.length > 0}<a class="button" href={`/api/admin/events/${id}/download`} download>Download event data</a>{/if}
+      </p>
+      {#if yourCars.length > 0}
+        <p class="muted small">
+          A zip with a folder for each practice and race session. In each folder, {yourCars.map(carName).join(', ')}
+          {yourCars.length === 1 ? 'has' : 'each have'} one raw log with every reading, including the VIN, plus who drove when, the laps and the stints.
+          {#if yourCars.length < e.cars.length}Only cars you can edit are included.{/if}
+        </p>
+      {/if}
+    {/if}
     <p class="muted">
       {dateText(e)}{#if e.course} · <a href={`/courses/${e.course}`}>{e.courseName}</a>, {e.layoutName}{/if}{#if e.cars.length} · {e.cars.map((c) => c.name).join(', ')}{/if}
     </p>

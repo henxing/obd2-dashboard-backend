@@ -51,7 +51,7 @@
     and codes; and courses.
   </p>
   <p>
-    <strong>Never public:</strong> email addresses, car tokens and crew passcodes, and the VIN. The VIN is only in a session's raw download, which only the car's maker, the editors
+    <strong>Never public:</strong> email addresses, car tokens and crew passcodes, and the VIN. The VIN is only in a session's raw download, or an event's, which only the car's maker, the editors
     they choose, and the site's master admins can get.
   </p>
 

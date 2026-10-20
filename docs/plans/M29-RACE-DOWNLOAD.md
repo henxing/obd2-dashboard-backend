@@ -10,8 +10,9 @@ exported data should merge the sessions, but keep the driver data and all
 other metadata intact (including vin). it should have all the raw data
 available."
 
-> **Planned 2026-10-20**, checked against the code. Three choices below wait
-> on Sam (**To confirm**); the plan is written with the recommended answer.
+> **Planned 2026-10-20**, checked against the code. **Sam confirmed all three
+> choices the same day** ("1. that's fine 2. yes, also fine 3. yes").
+> **Built 2026-10-20** (M29.1–M29.4, M29.6); M29.5, the deploy, is next.
 
 ---
 
@@ -120,7 +121,7 @@ results.json                  the event's results as its page shows them
 - **The server and the site change. Nothing on the tablet or in the contract
   changes.**
 
-### To confirm (Sam)
+### Confirmed (Sam, 2026-10-20)
 
 1. **Who gets it:** car by car, only cars you may edit (the privacy page's
    rule). The other choice is anyone, VIN included, which would change the
@@ -135,7 +136,7 @@ results.json                  the event's results as its page shows them
 
 ## The steps
 
-### M29.1 — The merge (pure, tested)
+### M29.1 — The merge (pure, tested) ✅
 
 In `:archive`, `RaceLog.write(sessions, out)` takes the sessions in order
 plus a way to read each one, and writes their lines back to back, adding a
@@ -148,7 +149,11 @@ Tests:
 - a session still in pieces (segments);
 - the order kept as given.
 
-### M29.2 — What goes beside it (pure, tested)
+**Built** as `MergedLog` (4 tests, including a line split across two of a
+session's pieces). It tells each line to a callback as it copies, so the lap
+speeds come from the same single read.
+
+### M29.2 — What goes beside it (pure, tested) ✅
 
 `eventResults` moves out of `publicEventRoutes` into an `EventResultsService`
 that both routes use. The event page's tests must pass unchanged.
@@ -164,7 +169,14 @@ Tests:
 - CSV quoting for driver and session names with commas or quotes;
 - left-out cars are named in the README.
 
-### M29.3 — The route
+**Built:** `EventResultsService` (`EventResults.kt`) and `EventExport`
+(`EventDownload.kt`). The event page's tests pass unchanged. A race part's
+laps are the race's (`CarRace.laps` in that part's sessions), each with its
+stint's driver. A practice's laps are its rows, one per driver's stretch.
+Times of day are each session's measured clock offset, else the race's for
+that car.
+
+### M29.3 — The route ✅
 
 `GET /api/admin/events/{id}/download`:
 - signed in; 404 for an event you can't see (hidden);
@@ -182,7 +194,18 @@ Tests on the in-memory archive:
 - a live session included and marked;
 - a second download at once: 429.
 
-### M29.4 — The button
+**Built**, with 4 tests in `EventDownloadTest`:
+- not signed in, no car of yours, and no such event;
+- the folders, the merged logs byte for byte, the VIN, the left-out car and
+  `event.json`;
+- drivers either side of a change, numbering on through race session 2,
+  stints and speeds;
+- a master admin gets every car.
+
+**Not tested:** the 429. It's an `AtomicBoolean` around the response, and a
+test would need a store that blocks mid-read.
+
+### M29.4 — The button ✅
 
 On the event page, a **Download event data** button beside Edit, shown when
 signed in and allowed to edit one of its cars (`allowedFor('car', …)` for
@@ -195,6 +218,21 @@ Checked on the dev server: a synthetic event with two parts and a driver
 change; the zip opened, and the merged log compared line for line with each
 session's own download.
 
+**Checked 2026-10-20** on the dev server. Four synthetic NHMS sessions,
+replayed:
+- practice in two back to back on one run of the app;
+- race session 1 with a driver change (SAM to DRE);
+- race session 2 a day later, no driver set.
+
+The event had the sessions added by hand. The result:
+- the zip (470 kB, 0.12 s) has the 14 files above;
+- each merged log is byte for byte the session downloads put end to end;
+- `laps.csv` has SAM on laps 1–3 and DRE on 4–8, and race session 2 goes on
+  from lap 9;
+- `stints.csv` has stint 2 starting at the change;
+- speeds are filled in;
+- the button and its note show for the dev master admin.
+
 ### M29.5 — Deployed, and measured on NHMS
 
 Deployed as usual: a smoke car streaming live across the deploy.
@@ -206,9 +244,23 @@ reconnects on a live stream during it.
 
 The numbers go to JOURNAL.
 
-### M29.6 — Lap speeds in `laps.csv` (if confirmed)
+### M29.6 — Lap speeds in `laps.csv` ✅
 
 `lapSpeeds.ts`'s rule in Kotlin, with the site's tests ported. Top, low and
 average are read from each session's prepared series (positions on the
 receiver's time and filtered, decision 45), so the numbers match the
 session's page.
+
+**Built differently, as `LapSpeeds` in `:archive`** (5 tests). It reads the
+same raw lines as the merge, as they stream, keeping only speeds and
+positions. The prepared series would have been a second read, and a whole
+series held in memory.
+
+It applies the series' rules:
+- each session's GPS speed, else the car's;
+- positions placed by `fixAt` and filtered by `FixFilter`. The placement is
+  now `FixFilter.placed`, shared with `SeriesBuilder`.
+
+Then it applies the page's rule (`COVER_MS`, average over positions). On a
+long session it can differ slightly from the page, which may be showing the
+thinned series.

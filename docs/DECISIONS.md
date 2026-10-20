@@ -1200,3 +1200,37 @@ tablet's own fixes (the app falls back to it when the external receiver is
 silent for a second). So what the rule catches there is a fix whose time
 doesn't fit where it is, at a hand-over, not one off in the infield; the
 100 m+ "jumps" seen before were Bluetooth's bunching read as time.
+
+## 46. An event's data, downloaded: each car's sessions merged, nothing in them changed
+
+**Decision.** (M29; Sam, 2026-10-20.) An event's page has **Download event
+data**: a zip with a folder per part (practice, race session 1, race
+session 2), and in each a folder per car.
+- **The raw log is merged, never rewritten.** The car's sessions in that part
+  follow each other in the order first heard, every line exactly as the
+  tablet sent it, VIN included. Each session's own `session` line says where
+  it starts. A missing final newline is the only thing ever added.
+  (Sam chose this over a session id added to every line.)
+- **Who drove when goes beside the log, as data:**
+  - `sessions.json`: each session's header, driver and driver changes;
+  - `laps.csv`: each lap with its driver, stint and speeds;
+  - `stints.csv`: the race parts' stints;
+  - `event.json`: flags, edited stints, sessions by part.
+
+  Merging can't lose any of it, since all of it is kept as times
+  (decisions 35, 43, 44).
+- **Car by car, only for its editors:** creator, editors, master admins, as a
+  session's raw download is (M23), since the VIN is in it. Cars you can't
+  edit are left out and named in the README. The results are public and
+  always included.
+- **One download at a time:** a second gets 429. The zip is written as it's
+  sent, on the instance that serves live streams (decision 20).
+- **Lap speeds** use the session page's rule (Sam: "3. yes"), worked out from
+  the same raw lines on the same read.
+
+**Why.** Sam wanted a race's data in one file per race session, with the
+drivers kept. Rewriting the stored sessions into one would break every link
+to them: re-timings, driver changes, event parts and the live page. It
+would also leave stored logs that the tablet never sent. Merging only in the
+download gives the one file and keeps the store as it is.
+

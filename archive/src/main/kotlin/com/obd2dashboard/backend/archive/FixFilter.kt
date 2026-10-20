@@ -2,6 +2,7 @@ package com.obd2dashboard.backend.archive
 
 import kotlin.math.cos
 import kotlin.math.hypot
+import kotlinx.serialization.json.JsonObject
 
 /**
  * **Positions no car could have reached** (M28), dropped from a session's
@@ -76,8 +77,19 @@ public class FixFilter(
         return hypot(dx, dy)
     }
 
-    private companion object {
+    internal companion object {
         /** Metres a degree of latitude, as the lap rule's frame has it. */
         const val METRES_PER_DEGREE = 111_195.0
+
+        /**
+         * A `gps.position` sample at [wall] as a fix: placed when the receiver took it (M28, §22.3), on `wall`'s
+         * clock, since Bluetooth hands fixes over in bursts and `wall` alone bunches them. Without `fixAt`, as it arrived.
+         */
+        fun placed(record: JsonObject, wall: Long, lat: Double, lon: Double): Fix {
+            val at = record.long("at")
+            val fixAt = record.long("fixAt")?.takeIf { at != null && it <= at }
+            val t = if (at != null && fixAt != null) wall - (at - fixAt) else wall
+            return Fix(fixAt ?: at ?: wall, t, lat, lon)
+        }
     }
 }

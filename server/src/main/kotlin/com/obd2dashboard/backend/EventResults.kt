@@ -234,18 +234,21 @@ data class CourseBest(val course: String, val courseName: String, val event: Str
 @Serializable
 data class DriverRecord(val driver: DriverView, val events: List<DriverEvent>, val courses: List<CourseBest>)
 
-/** Events, public (M14.5): the list, and one with its practice results. */
-fun Route.publicEventRoutes(
-    stores: EventStores,
-    courses: CourseStore,
-    registry: CarRegistry,
-    archive: ArchiveService,
-    retiming: RetimingJobs,
+/**
+ * An event's results (M14.5, M15.4), as its page and its download (M29) both
+ * have them: practice from each session's laps, the race as one timeline.
+ */
+class EventResultsService(
+    private val stores: EventStores,
+    private val courses: CourseStore,
+    private val registry: CarRegistry,
+    private val archive: ArchiveService,
+    private val retiming: RetimingJobs,
     /** The live runs (M17.6): sessions not complete yet count, marked. */
-    live: LiveTimings? = null,
-    hub: LiveHub? = null,
+    private val live: LiveTimings? = null,
+    private val hub: LiveHub? = null,
     /** Results held briefly, so many viewers cost one computation. */
-    held: ResultsHold = ResultsHold(),
+    private val held: ResultsHold = ResultsHold(),
 ) {
     suspend fun public(event: Event): PublicEvent {
         val course = courses.get(event.course)
@@ -266,15 +269,6 @@ fun Route.publicEventRoutes(
     fun seen(event: Event, hidden: Hidden): Event =
         if (event.cars.none(hidden::car)) event
         else event.copy(cars = event.cars.filterNot(hidden::car), parts = event.parts.map { p -> p.copy(stints = p.stints.filterKeys { !hidden.car(it) }) })
-
-    fun PublicEvent.naming(hidden: Hidden): PublicEvent =
-        if (hidden.course(course)) copy(course = "", courseName = "", layout = "", layoutName = "") else this
-
-    get("/api/events") {
-        val hidden = call.hidden()
-        val marks = call.hiddenMarks()
-        call.respond(stores.events.list().filterNot { hidden.event(it.id) }.map { public(seen(it, hidden)).naming(hidden).copy(hidden = marks.event(it.id)) })
-    }
 
     /** An event's results (M14.5, M15.4): practice from each session's laps, the race as one timeline. */
     suspend fun eventResults(event: Event): EventResults {
@@ -364,11 +358,24 @@ fun Route.publicEventRoutes(
         val results = held.get(shown) { eventResults(shown) }
         return if (hidden.course(event.course)) results.copy(event = results.event.naming(hidden)) else results
     }
+}
+
+/** Without naming a course hidden from whoever's asking (M25). */
+fun PublicEvent.naming(hidden: Hidden): PublicEvent =
+    if (hidden.course(course)) copy(course = "", courseName = "", layout = "", layoutName = "") else this
+
+/** Events, public (M14.5): the list, and one with its practice results. */
+fun Route.publicEventRoutes(stores: EventStores, service: EventResultsService) {
+    get("/api/events") {
+        val hidden = call.hidden()
+        val marks = call.hiddenMarks()
+        call.respond(stores.events.list().filterNot { hidden.event(it.id) }.map { service.public(service.seen(it, hidden)).naming(hidden).copy(hidden = marks.event(it.id)) })
+    }
 
     get("/api/events/{id}") {
         val event = stores.events.get(call.parameters["id"].orEmpty())
             ?: return@get call.respond(HttpStatusCode.NotFound, ApiError("not_found", "No such event."))
-        val results = results(event, call.hidden())
+        val results = service.results(event, call.hidden())
         call.respond(if (call.hiddenMarks().event(event.id)) results.copy(event = results.event.copy(hidden = true)) else results)
     }
 
@@ -377,7 +384,7 @@ fun Route.publicEventRoutes(
             ?: return@get call.respond(HttpStatusCode.NotFound, ApiError("not_found", "No such driver."))
         val hidden = call.hidden()
         val events = stores.events.list().filterNot { hidden.event(it.id) }.map { e ->
-            val results = results(e, hidden)
+            val results = service.results(e, hidden)
             val practice = results.parts.filter { it.part.kind == "practice" }.flatMap { p ->
                 p.bests.filter { it.driver?.id == driver.id }.map { DriverPracticeBest(p.part.name, it) }
             }

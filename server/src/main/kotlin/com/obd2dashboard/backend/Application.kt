@@ -176,7 +176,9 @@ fun Application.module(
         )
         adminEventRoutes(events, courses, registry, archive, clock, adminAuth, admin, onChanged = edited)
         publicCourseRoutes(courses)
-        publicEventRoutes(events, courses, registry, archive, retiming, liveTimings, hub, resultsHold)
+        val eventResults = EventResultsService(events, courses, registry, archive, retiming, liveTimings, hub, resultsHold)
+        publicEventRoutes(events, eventResults)
+        eventDownloadRoutes(events, archive, eventResults)
         sessionRoutes(
             registry, archive, hub, clock, laps = { car, id, on -> retiming.sessionLaps(car, id, on) }, drivers = events.drivers, events = events.events,
             messages = { car, from, to -> messages.between(car, from, to) },
