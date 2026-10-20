@@ -44,6 +44,7 @@ Where this plan and the contract disagree, the contract wins. Fix the plan.
 | **M27** | Driver changes within a session: split a session where the driver changed, each part's laps its driver's (practice, race stints, live, driver pages) | **deployed** (00045): decision 44, [`plans/COMPLETED.md`](plans/COMPLETED.md) |
 | **M28** | A session's GPS positions at the receiver's time (not when the tablet heard them, which Bluetooth bunches), and positions no car could reach left out of the map and speeds; lap timing unchanged | **deployed** (00049, 00050): decision 45, [`plans/COMPLETED.md`](plans/COMPLETED.md) |
 | **M29** | Download an event's data: a folder per part (practice, race session 1, race session 2), each car's sessions merged into one raw log (every line as the tablet sent it, VIN included, for the car's editors), with drivers, driver changes, laps, stints and flags beside it | **deployed** (00051): decision 46, [`plans/COMPLETED.md`](plans/COMPLETED.md) |
+| **M30** | A session's GPS on the receiver's time: a fix's speed and heading with its position; a session's measured GPS latency, moving its positions, readings, laps and pit crossings (never a lap's time); a session's videos, each placed on `wall` | **proposed** (pull request from Hugh, 2026-10-20): decision 47, [`plans/M30-VIDEO-TIMING.md`](plans/M30-VIDEO-TIMING.md) |
 
 **How a milestone runs**, as in the app:
 - A plan in `docs/plans/` sketches every step.
