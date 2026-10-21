@@ -1259,6 +1259,8 @@ things (JOURNAL 2026-10-20, M30):
 - The receiver ran about 0.65 s behind the car's own motion. With that
   taken out, the lap ticked over as the car crossed the start/finish band
   in the video. Without it, it ticked late.
+- The race's transponder timing (Speedhive) agrees: its crossings come a
+  median 0.55 s before ours, over 221 laps.
 
 The latency is a measurement of one session's GPS, kept on the session
 where it was measured. The server makes no guess of its own and learns

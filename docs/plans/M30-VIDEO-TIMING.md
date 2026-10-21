@@ -147,6 +147,8 @@ day is refused; signed out is refused; an empty list clears them.
    timing loop).
    - The alternative is to keep it in the tool that needs it, as the
      overlay does now.
+   - The race's transponder timing agrees with it (JOURNAL 2026-10-20,
+     M30): official crossings come a median 0.55 s before ours.
    - M30.1 stands on its own either way.
 2. **Should a latency go on the car's page too**, and should the car page be
    able to set it? This milestone only adds the API.
